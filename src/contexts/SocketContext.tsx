@@ -278,17 +278,10 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 connectionRef.current?.signal(signal);
             });
 
-            // When call is delivered to recipient (they are online)
+            // When call is "ringing" - always show this for simplified UX
             newSocket.on('call-ringing', () => {
-                console.log('[CallDebug] Call is ringing on recipient device');
+                console.log('[CallDebug] Call is ringing');
                 setCallStatus('ringing');
-            });
-
-            // When recipient is offline
-            newSocket.on('user-offline', () => {
-                console.log('[CallDebug] User is offline');
-                toast.error('User is offline', { duration: 3000 });
-                // Keep showing "Calling..." - they might come online
             });
 
             newSocket.on('ice-candidate', ({ candidate }) => {

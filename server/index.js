@@ -296,28 +296,26 @@ io.on("connection", (socket) => {
 
     // --- Call Signaling Events ---
 
-    // 1. Caller initiates call (Only after permission if enforced on client)
-    // 1. Caller initiates call (Only after permission if enforced on client)
+    // 1. Caller initiates call
     socket.on("call-user", (data) => {
         const { userToCall, signalData, from, name, image } = data;
         const targetUser = activeUsers.find((u) => u.userId === userToCall);
         const callerSocket = activeUsers.find((u) => u.userId === from);
 
-        console.log(`Call from ${from} to ${userToCall}`);
+        console.log(`[SERVER] Call from ${from} to ${userToCall}`);
 
+        // Always notify caller that call is "ringing" (simplified UX)
+        if (callerSocket) {
+            io.to(callerSocket.socketId).emit("call-ringing", { to: userToCall });
+        }
+
+        // If user is online, deliver the call to them
         if (targetUser) {
-            // User is ONLINE - deliver the call
+            console.log(`[SERVER] User ${userToCall} is online, delivering call...`);
             io.to(targetUser.socketId).emit("call-made", { signal: signalData, from, name, image });
-
-            // Notify caller that their call is ringing on recipient's device
-            if (callerSocket) {
-                io.to(callerSocket.socketId).emit("call-ringing", { to: userToCall });
-            }
         } else {
-            // User is OFFLINE - notify caller
-            if (callerSocket) {
-                io.to(callerSocket.socketId).emit("user-offline", { to: userToCall });
-            }
+            console.log(`[SERVER] User ${userToCall} is offline, call will timeout...`);
+            // Don't notify about offline - just let it "ring" until timeout
         }
     });
 
