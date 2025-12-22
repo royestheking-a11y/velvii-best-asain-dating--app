@@ -11,11 +11,18 @@ import { generateId } from '@/utils/helpers';
 import { Message } from '@/types';
 
 interface SocketContextType {
-    callUser: (userId: string, userName: string, userImage: string, matchId?: string, onMessageSent?: (msg: Message) => void) => void;
+    callUser: (userId: string, userName: string, userImage: string, matchId?: string, onMessageSent?: (msg: Message) => void, isVideo?: boolean) => void;
     acceptVoiceRequest: (targetUserId: string, matchId: string, requestId: string, onMessageUpdate?: (msg: Message) => void) => void;
     rejectVoiceRequest: (targetUserId: string, requestId: string, onMessageUpdate?: (msg: Message) => void) => void;
     socket: Socket | null;
     onlineUsers: { userId: string; socketId: string }[];
+    // Video call additions
+    isVideoCall: boolean;
+    isCameraOn: boolean;
+    toggleCamera: () => void;
+    stream: MediaStream | null;
+    localVideoRef: React.RefObject<HTMLVideoElement | null>;
+    remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -117,9 +124,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(false);
 
+    // Video Call State
+    const [isVideoCall, setIsVideoCall] = useState(false);
+    const [isCameraOn, setIsCameraOn] = useState(true);
+
     // Refs
     const connectionRef = useRef<Peer.Instance | null>(null);
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+    const localVideoRef = useRef<HTMLVideoElement | null>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const otherUserIdRef = useRef<string>('');
     const ringtoneRef = useRef<HTMLAudioElement | null>(null);
 
@@ -258,13 +271,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             });
 
             // --- CALL EVENTS ---
-            newSocket.on('call-made', ({ signal, from, name, image }) => {
+            newSocket.on('call-made', ({ signal, from, name, image, isVideoCall: incomingIsVideo }) => {
                 setCallStatus('incoming');
                 setCallerName(name || 'Unknown');
                 setCallerImage(image || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'); // Generic Fallback
                 setCallerSignal(signal);
                 setOtherUserId(from);
                 setIsMinimized(false);
+                setIsVideoCall(incomingIsVideo || false); // Set video call flag from incoming call
+                setIsCameraOn(incomingIsVideo || false);
 
                 // Play Incoming Ringtone
                 playRingtone('incoming');
@@ -412,21 +427,47 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     }, [currentUser]);
 
-    // Audio Stream Setup
-    const getMedia = async () => {
+    // Media Stream Setup (supports audio + video)
+    const getMedia = async (withVideo: boolean = false) => {
         try {
-            const currentStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            const constraints = {
+                audio: true,
+                video: withVideo ? {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                } : false
+            };
+            const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
             return currentStream;
         } catch (err) {
             console.error('Failed to get media:', err);
-            toast.error('Could not access microphone.');
-            return null;
+            if (withVideo) {
+                toast.error('Could not access camera. Trying audio only...');
+                // Fallback to audio only
+                try {
+                    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    setStream(audioStream);
+                    setIsVideoCall(false);
+                    return audioStream;
+                } catch (audioErr) {
+                    toast.error('Could not access microphone.');
+                    return null;
+                }
+            } else {
+                toast.error('Could not access microphone.');
+                return null;
+            }
         }
     };
 
     // 0. START FLOW
-    const callUser = async (userId: string, userName: string, userImage: string, matchId?: string, onMessageSent?: (msg: Message) => void) => {
+    const callUser = async (userId: string, userName: string, userImage: string, matchId?: string, onMessageSent?: (msg: Message) => void, isVideo: boolean = false) => {
+
+        // Set video call state
+        setIsVideoCall(isVideo);
+        setIsCameraOn(isVideo);
 
         // ---------------------------------------------------------
         // ROBUSTNESS FIX: RECOVER MATCH ID IF MISSING (Google/State issue)
@@ -567,7 +608,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCallStatus('outgoing');
         playRingtone('outgoing'); // Play Ringback
 
-        const currentStream = await getMedia();
+        const currentStream = await getMedia(isVideoCall);
         if (!currentStream || !socket) return;
 
         // ICE servers with STUN + free TURN for better connectivity
@@ -593,19 +634,24 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 ? currentUser.photos[0]
                 : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
-            console.log("[CallDebug] Emitting call-user. Image:", userPhoto);
+            console.log("[CallDebug] Emitting call-user. Image:", userPhoto, "isVideo:", isVideoCall);
 
             socket.emit('call-user', {
                 userToCall: userId,
                 signalData: data,
                 from: currentUser?.id,
                 name: currentUser?.fullName,
-                image: userPhoto
+                image: userPhoto,
+                isVideoCall: isVideoCall // Pass video call flag
             });
         });
 
         peer.on('stream', (userStream) => {
-            playRemoteAudio(userStream);
+            if (isVideoCall) {
+                playRemoteVideo(userStream);
+            } else {
+                playRemoteAudio(userStream);
+            }
         });
 
         connectionRef.current = peer;
@@ -616,7 +662,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         stopRingtone(); // Stop Incoming Ring
         // Removed playSound('connect') per user request for silence
 
-        const currentStream = await getMedia();
+        const currentStream = await getMedia(isVideoCall);
         if (!currentStream || !socket) return;
         setCallAccepted(true);
         setCallStatus('connected');
@@ -643,7 +689,11 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
 
         peer.on('stream', (userStream) => {
-            playRemoteAudio(userStream);
+            if (isVideoCall) {
+                playRemoteVideo(userStream);
+            } else {
+                playRemoteAudio(userStream);
+            }
         });
 
         peer.signal(callerSignal);
@@ -679,6 +729,53 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             });
 
         remoteAudioRef.current = audio;
+    };
+
+    // Helper: Play Remote Video
+    const playRemoteVideo = (userStream: MediaStream) => {
+        // For video calls, we dispatch an event with the stream
+        // The CallModal will handle displaying the video
+        console.log('[CallDebug] Remote video stream received');
+
+        // Store the stream in a way the Modal can access
+        if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = userStream;
+            remoteVideoRef.current.play().catch(err => {
+                console.error('[CallDebug] Video play failed:', err);
+            });
+        }
+
+        // Also play audio from the stream
+        const audio = document.createElement('audio');
+        audio.srcObject = userStream;
+        audio.autoplay = true;
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+        audio.play().catch(() => { });
+        remoteAudioRef.current = audio;
+
+        // Dispatch custom event for UI to pick up the stream
+        window.dispatchEvent(new CustomEvent('remote-video-stream', { detail: userStream }));
+    };
+
+    // Helper: Set local video stream to element
+    const setLocalVideoStream = (stream: MediaStream) => {
+        if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+            localVideoRef.current.muted = true; // Mute local to prevent echo
+            localVideoRef.current.play().catch(() => { });
+        }
+    };
+
+    // Toggle Camera
+    const toggleCamera = () => {
+        if (stream) {
+            const videoTracks = stream.getVideoTracks();
+            videoTracks.forEach(track => {
+                track.enabled = !track.enabled;
+            });
+            setIsCameraOn(!isCameraOn);
+        }
     };
 
     // 3. Permission Response
@@ -963,7 +1060,14 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             acceptVoiceRequest,
             rejectVoiceRequest,
             socket,
-            onlineUsers
+            onlineUsers,
+            // Video call additions
+            isVideoCall,
+            isCameraOn,
+            toggleCamera,
+            stream,
+            localVideoRef,
+            remoteVideoRef
         }}>
             {children}
 
@@ -994,7 +1098,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     onRejectRequest={() => rejectVoiceRequest(otherUserId, 'legacy_request')}
                     isMuted={isMuted}
                     onToggleMute={toggleMute}
-                    onMinimize={toggleMinimize} // Now works
+                    onMinimize={toggleMinimize}
+                    // Video call props
+                    isVideoCall={isVideoCall}
+                    isCameraOn={isCameraOn}
+                    onToggleCamera={toggleCamera}
+                    localStream={stream}
                 />
             )}
         </SocketContext.Provider>

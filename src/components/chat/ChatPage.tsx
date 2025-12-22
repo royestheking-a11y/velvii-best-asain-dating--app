@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, ShieldAlert, Ban, Trash2, Check, CheckCheck, BadgeCheck, Phone, PhoneOff, Flag, X } from 'lucide-react';
+import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, ShieldAlert, Ban, Trash2, Check, CheckCheck, BadgeCheck, Phone, PhoneOff, Flag, X, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Message } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { ProfileDetailModal } from '@/components/swipe/ProfileDetailModal';
 import { BlockConfirmationModal } from './BlockConfirmationModal';
 import { ReportModal } from './ReportModal';
+import { CallTypeSelector } from '@/components/calling/CallTypeSelector';
 import { deleteMatch, addBlock, deleteAllMessagesForMatch, getMessagesForMatch, getAllMessages, setAllMessages } from '@/utils/storage';
 import { matches as apiMatches, actions as apiActions } from '@/services/api';
 
@@ -49,6 +50,7 @@ export const ChatPage: React.FC = () => {
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCallTypeSelector, setShowCallTypeSelector] = useState(false);
   const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -307,14 +309,25 @@ export const ChatPage: React.FC = () => {
     }
   };
 
+  // Show call type selector instead of directly calling
   const handleCallUser = () => {
+    setShowCallTypeSelector(true);
+  };
+
+  // Voice call handler
+  const handleVoiceCall = () => {
+    setShowCallTypeSelector(false);
     callUser(otherUser.id, otherUser.fullName, otherUser.photos[0], matchId, (sentMsg) => {
       setMessages(prev => [...prev, sentMsg]);
-      // Also save to DB via API if callUser doesn't? 
-      // callUser context likely emits socket. 
-      // We should probably save these system messages to DB too.
-      // apiMessages.send(sentMsg);
-    });
+    }, false); // false = voice call
+  };
+
+  // Video call handler
+  const handleVideoCall = () => {
+    setShowCallTypeSelector(false);
+    callUser(otherUser.id, otherUser.fullName, otherUser.photos[0], matchId, (sentMsg) => {
+      setMessages(prev => [...prev, sentMsg]);
+    }, true); // true = video call
   };
 
   // Actions
@@ -781,6 +794,16 @@ export const ChatPage: React.FC = () => {
         userName={otherUser.fullName}
         onClose={() => setShowReportModal(false)}
         onSubmit={handleReportSubmit}
+      />
+
+      {/* Call Type Selector */}
+      <CallTypeSelector
+        isOpen={showCallTypeSelector}
+        onClose={() => setShowCallTypeSelector(false)}
+        onSelectVoice={handleVoiceCall}
+        onSelectVideo={handleVideoCall}
+        userName={otherUser.fullName}
+        userImage={otherUser.photos?.[0] || 'https://via.placeholder.com/150'}
       />
 
       {/* Delete Confirmation Modal */}

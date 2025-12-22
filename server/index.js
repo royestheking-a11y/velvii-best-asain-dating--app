@@ -298,11 +298,11 @@ io.on("connection", (socket) => {
 
     // 1. Caller initiates call
     socket.on("call-user", (data) => {
-        const { userToCall, signalData, from, name, image } = data;
+        const { userToCall, signalData, from, name, image, isVideoCall } = data;
         const targetUser = activeUsers.find((u) => u.userId === userToCall);
         const callerSocket = activeUsers.find((u) => u.userId === from);
 
-        console.log(`[SERVER] Call from ${from} to ${userToCall}`);
+        console.log(`[SERVER] ${isVideoCall ? 'Video' : 'Voice'} call from ${from} to ${userToCall}`);
 
         // Always notify caller that call is "ringing" (simplified UX)
         if (callerSocket) {
@@ -312,7 +312,7 @@ io.on("connection", (socket) => {
         // If user is online, deliver the call to them
         if (targetUser) {
             console.log(`[SERVER] User ${userToCall} is online, delivering call...`);
-            io.to(targetUser.socketId).emit("call-made", { signal: signalData, from, name, image });
+            io.to(targetUser.socketId).emit("call-made", { signal: signalData, from, name, image, isVideoCall });
         } else {
             console.log(`[SERVER] User ${userToCall} is offline, call will timeout...`);
             // Don't notify about offline - just let it "ring" until timeout
