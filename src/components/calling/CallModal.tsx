@@ -106,7 +106,8 @@ export const CallModal: React.FC<CallModalProps> = ({
                 initial={{ opacity: 0, y: '100%' }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: '100%' }}
-                className="fixed inset-0 z-[9999] bg-[#0b141a] text-white overflow-hidden flex flex-col"
+                className="fixed inset-0 z-[9999] text-white overflow-hidden flex flex-col"
+                style={{ backgroundColor: '#0f172a' }} // Force solid background color
             >
                 {/* --- LAYER 1: BACKGROUND / REMOTE VIDEO --- */}
                 <div className="absolute inset-0 z-0">
@@ -197,7 +198,10 @@ export const CallModal: React.FC<CallModalProps> = ({
                 </div>
 
                 {/* --- LAYER 4: BOTTOM CONTROLS --- */}
-                <div className="absolute bottom-0 left-0 right-0 z-30 bg-[#0b141a] px-6 py-8 rounded-t-3xl">
+                <div
+                    className="absolute bottom-0 left-0 right-0 z-30 px-6 py-8 rounded-t-3xl"
+                    style={{ backgroundColor: '#0f172a' }}
+                >
 
                     {/* INCOMING CALL UI */}
                     {status === 'incoming' ? (
@@ -265,6 +269,6 @@ export const CallModal: React.FC<CallModalProps> = ({
                     )}
                 </div>
             </motion.div>
-        </AnimatePresence>
+        </AnimatePresence >
     );
 };
