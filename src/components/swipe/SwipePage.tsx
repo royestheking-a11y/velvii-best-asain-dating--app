@@ -156,24 +156,35 @@ export const SwipePage: React.FC = () => {
 
         // --- Privacy Check: Only Show to People I've Liked ---
         if (user.settings?.privacy?.onlyShowToLiked && !likedMeUserIds.has(user.id)) {
+          console.log(`[FILTER] User ${user.fullName} rejected: Privacy onlyShowToLiked`);
           return false;
         }
 
         // --- Apply Filters ---
 
         // Gender
-        if (filters.gender !== 'everyone' && filters.gender !== user.gender) return false;
-        // If 'everyone' is selected, we do NOT filter by gender at all. 
-        // This overrides the profile 'interestedIn' setting for discovery mode.
+        if (filters.gender !== 'everyone' && filters.gender !== user.gender) {
+          console.log(`[FILTER] User ${user.fullName} rejected: Gender (${user.gender} !== ${filters.gender})`);
+          return false;
+        }
 
         // Verified
-        if (filters.verifiedOnly && !user.isVerified) return false;
+        if (filters.verifiedOnly && !user.isVerified) {
+          console.log(`[FILTER] User ${user.fullName} rejected: VerifiedOnly`);
+          return false;
+        }
 
         // Has Bio
-        if (filters.hasBio && !user.bio) return false;
+        if (filters.hasBio && !user.bio) {
+          console.log(`[FILTER] User ${user.fullName} rejected: No Bio`);
+          return false;
+        }
 
         // Active Recently (Online Now)
-        if (filters.onlineNow && !user.isOnline) return false;
+        if (filters.onlineNow && !user.isOnline) {
+          console.log(`[FILTER] User ${user.fullName} rejected: Not Online`);
+          return false;
+        }
 
         // Age Calculation
         if (user.dateOfBirth) {
@@ -181,7 +192,10 @@ export const SwipePage: React.FC = () => {
           const ageDiffMs = Date.now() - dob.getTime();
           const ageDate = new Date(ageDiffMs); // miliseconds from epoch
           const age = Math.abs(ageDate.getUTCFullYear() - 1970);
-          if (age < filters.ageRange[0] || age > filters.ageRange[1]) return false;
+          if (age < filters.ageRange[0] || age > filters.ageRange[1]) {
+            console.log(`[FILTER] User ${user.fullName} rejected: Age ${age} not in [${filters.ageRange}]`);
+            return false;
+          }
         }
 
         return true;
@@ -201,7 +215,13 @@ export const SwipePage: React.FC = () => {
       });
 
       // Filter by Distance
-      const distFiltered = usersWithDist.filter(u => u.dist <= filters.distance[0]);
+      const distFiltered = usersWithDist.filter(u => {
+        if (u.dist > filters.distance[0]) {
+          console.log(`[FILTER] User ${u.user.fullName} rejected: Distance ${u.dist.toFixed(1)}km > ${filters.distance[0]}km`);
+          return false;
+        }
+        return true;
+      });
 
       // Sort by distance
       distFiltered.sort((a, b) => a.dist - b.dist);
