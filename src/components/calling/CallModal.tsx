@@ -125,7 +125,7 @@ export const CallModal: React.FC<CallModalProps> = ({
 
                     {/* Dark Background + Avatar (If not connected OR voice mode OR waiting for stream) */}
                     {(!isVideoMode || !isConnected || !remoteStream) && (
-                        <div className="w-full h-full flex flex-col items-center justify-start pt-40 bg-[#0f172a]" style={{ backgroundColor: '#0f172a' }}>
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0f172a]" style={{ backgroundColor: '#0f172a' }}>
                             <div className="relative mb-6">
                                 {(status === 'ringing' || status === 'incoming' || status === 'outgoing') && (
                                     <>
@@ -189,7 +189,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                     <div className="flex flex-col items-center justify-center pt-1">
 
                         {isVideoMode && isConnected && (
-                            <div className="flex flex-col items-center mt-1">
+                            <div className="flex flex-col items-center mt-8">
                                 <h3 className="font-semibold text-lg shadow-black drop-shadow-md whitespace-nowrap overflow-hidden text-ellipsis max-w-[60vw]">{callerName}</h3>
                                 <span className="text-sm text-white/80 shadow-black drop-shadow-md">{formatTime(duration)}</span>
                             </div>
