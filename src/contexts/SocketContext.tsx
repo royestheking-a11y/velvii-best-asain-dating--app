@@ -751,9 +751,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         stopRingtone(); // Ensure ringtone stops
         playSound('end');
 
-        // Capture current state for async logic
+        // CRITICAL: Capture current state BEFORE any state updates
+        const _callStatus = callStatus;
         const _otherUserId = otherUserId;
         const _currentUser = currentUser;
+
+        console.log(`[leaveCall] Captured state - status: ${_callStatus}, otherUserId: ${_otherUserId}`);
 
         // Reset UI State IMMEDIATELY (Responsive)
         setCallAccepted(false);
@@ -804,7 +807,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // Fallback default
         if (!resolvedMatchId) resolvedMatchId = 'unknown';
 
-        if (callStatus === 'connected') {
+        if (_callStatus === 'connected') {
             const durationText = formatDuration(callDuration);
             const logMsg: Message = {
                 id: generateId(),
@@ -835,14 +838,18 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             }
 
             // CRITICAL FIX: Tell the other user to hang up
+            console.log(`[leaveCall] Connected call ended, emitting end-call to: ${_otherUserId}`);
             socket?.emit("end-call", { to: _otherUserId });
         }
-        else if (callStatus === 'incoming') {
+        else if (_callStatus === 'incoming') {
             // Rejected the call by ME (the callee)
+            console.log(`[leaveCall] Rejecting incoming call, emitting reject-call to: ${_otherUserId}`);
             socket?.emit('reject-call', { to: _otherUserId });
         }
-        else if (callStatus === 'outgoing' || callStatus === 'ringing' || callStatus === 'requesting') {
+        else if (_callStatus === 'outgoing' || _callStatus === 'ringing' || _callStatus === 'requesting') {
             // Cancelled by ME (the caller) -> Missed Call for THEM
+            console.log(`[leaveCall] Cancelling outgoing/ringing call, emitting end-call to: ${_otherUserId}`);
+
             const missedMsg: Message = {
                 id: generateId(),
                 matchId: resolvedMatchId,
@@ -871,6 +878,8 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             }
 
             socket?.emit("end-call", { to: _otherUserId });
+        } else {
+            console.log(`[leaveCall] Unknown status: ${_callStatus}, not sending any socket events`);
         }
     };
 

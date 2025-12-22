@@ -345,10 +345,15 @@ io.on("connection", (socket) => {
     // 5. End Call (Clean Termination)
     socket.on("end-call", (data) => {
         const { to } = data;
+        console.log(`[SERVER] end-call received. Terminating call for user: ${to}`);
+
         const user = activeUsers.find((u) => u.userId === to);
         if (user) {
-            console.log(`Call ENDED by ${socket.id} for ${to}`);
+            console.log(`[SERVER] User ${to} found at socket ${user.socketId}. Emitting call-ended...`);
             io.to(user.socketId).emit("call-ended");
+        } else {
+            console.log(`[SERVER] User ${to} NOT found in activeUsers. Cannot emit call-ended.`);
+            console.log(`[SERVER] Active users:`, activeUsers.map(u => u.userId));
         }
     });
 
