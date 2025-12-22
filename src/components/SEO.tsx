@@ -2,7 +2,7 @@ import { Helmet } from "react-helmet-async";
 
 export const SEO = () => (
     <Helmet>
-        <title>Velvii – Best Dating App | Meet Singles Near You</title>
+        <title>Velvii Best Asain Dating App | Meet Singles Near You</title>
         <meta
             name="description"
             content="Velvii is the best online dating & social discovery platform like Tantan and Tinder. Meet singles, chat, date, or find friendships instantly."
