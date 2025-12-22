@@ -132,6 +132,10 @@ export const SwipePage: React.FC = () => {
       const distinctAiUsers = allUsers.filter(u => u.isAI);
       const distinctRealUsers = allUsers.filter(u => !u.isAI);
 
+      console.log("[SWIPE_DEBUG] All Users Fetched:", allUsers.length);
+      console.log("[SWIPE_DEBUG] AI Users:", distinctAiUsers.length);
+      console.log("[SWIPE_DEBUG] Real Users:", distinctRealUsers.length);
+
       // AI Logic: ONLY Show Opposite Gender & Unswiped
       let targetAiGender: 'male' | 'female' = 'female';
       if (currentUser.gender === 'female') targetAiGender = 'male';
@@ -143,6 +147,7 @@ export const SwipePage: React.FC = () => {
       );
       // We show ALL relevant AI users available (the request implies 3 exist, we show all if unswiped)
       const selectedAiUsers = relevantAiUsers;
+      console.log("[SWIPE_DEBUG] Relevant AI Users (Gender Logic):", relevantAiUsers.length);
 
       // Real User Logic (Filter & Sort)
       const filteredRealUsers = distinctRealUsers.filter((user) => {

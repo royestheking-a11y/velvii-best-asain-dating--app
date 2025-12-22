@@ -39,6 +39,7 @@ export const OverviewSection: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       const data = await apiAdmin.getStats();
+      console.log("[ADMIN_DEBUG] Stats Data Received:", data);
 
       setStats({
         totalUsers: data.totalUsers,
