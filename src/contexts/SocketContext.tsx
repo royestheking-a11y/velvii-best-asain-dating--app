@@ -135,11 +135,16 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const otherUserIdRef = useRef<string>('');
     const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+    const isVideoCallRef = useRef<boolean>(false);
 
-    // Update ref when state changes
+    // Update refs when state changes
     useEffect(() => {
         otherUserIdRef.current = otherUserId;
     }, [otherUserId]);
+
+    useEffect(() => {
+        isVideoCallRef.current = isVideoCall;
+    }, [isVideoCall]);
 
     // --- SOUND MANAGEMENT ---
     const playRingtone = (type: 'incoming' | 'outgoing') => {
@@ -647,7 +652,8 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
 
         peer.on('stream', (userStream) => {
-            if (isVideoCall) {
+            console.log('[CallDebug] Received stream, isVideoCall:', isVideoCallRef.current);
+            if (isVideoCallRef.current) {
                 playRemoteVideo(userStream);
             } else {
                 playRemoteAudio(userStream);
@@ -689,7 +695,8 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
 
         peer.on('stream', (userStream) => {
-            if (isVideoCall) {
+            console.log('[CallDebug] Answer received stream, isVideoCall:', isVideoCallRef.current);
+            if (isVideoCallRef.current) {
                 playRemoteVideo(userStream);
             } else {
                 playRemoteAudio(userStream);

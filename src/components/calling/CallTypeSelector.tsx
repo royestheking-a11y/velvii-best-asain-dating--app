@@ -27,88 +27,81 @@ export const CallTypeSelector: React.FC<CallTypeSelectorProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[9999] flex items-center justify-center px-6"
+                className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
                 onClick={onClose}
             >
-                {/* Backdrop */}
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                {/* Dark Backdrop */}
+                <div className="absolute inset-0 bg-black/70" />
 
-                {/* Modal */}
+                {/* Modal - Solid White Background */}
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0, y: 20 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     exit={{ scale: 0.9, opacity: 0, y: 20 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="relative w-full max-w-sm bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-3xl p-8 shadow-2xl border border-white/10"
+                    className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Close Button */}
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
                     >
                         <X className="w-4 h-4" />
                     </button>
 
                     {/* Header */}
-                    <div className="text-center mb-8">
-                        <div className="relative inline-block mb-4">
-                            <div className="w-20 h-20 rounded-full border-2 border-orange-500/50 p-0.5 mx-auto">
+                    <div className="text-center mb-6">
+                        <div className="relative inline-block mb-3">
+                            <div className="w-16 h-16 rounded-full border-2 border-orange-400 p-0.5 mx-auto">
                                 <img
                                     src={userImage}
                                     alt={userName}
                                     className="w-full h-full rounded-full object-cover"
                                 />
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-[#1E293B] flex items-center justify-center">
-                                <div className="w-2 h-2 bg-white rounded-full" />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full" />
                             </div>
                         </div>
-                        <p className="text-white/60 text-sm mb-1">Call with</p>
-                        <h2 className="text-white text-xl font-bold">{userName}</h2>
+                        <p className="text-gray-500 text-sm mb-1">Call with</p>
+                        <h2 className="text-gray-900 text-lg font-bold">{userName}</h2>
                     </div>
 
                     {/* Call Type Options */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-2 gap-3 mb-5">
                         {/* Voice Call */}
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <button
                             onClick={onSelectVoice}
-                            className="group relative bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 hover:from-emerald-500/30 hover:to-emerald-600/20 border border-emerald-500/30 rounded-2xl p-6 flex flex-col items-center gap-3 transition-all duration-300"
+                            className="bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-300 rounded-2xl p-5 flex flex-col items-center gap-2 transition-all duration-200"
                         >
-                            <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                                <Phone className="w-7 h-7 text-white" />
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md">
+                                <Phone className="w-6 h-6 text-white" />
                             </div>
-                            <span className="text-white font-semibold">Voice</span>
-                            <span className="text-white/50 text-xs">Audio only</span>
-                        </motion.button>
+                            <span className="text-gray-800 font-semibold text-sm">Voice</span>
+                            <span className="text-gray-500 text-xs">Audio only</span>
+                        </button>
 
                         {/* Video Call */}
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <button
                             onClick={onSelectVideo}
-                            className="group relative bg-gradient-to-br from-orange-500/20 to-orange-600/10 hover:from-orange-500/30 hover:to-orange-600/20 border border-orange-500/30 rounded-2xl p-6 flex flex-col items-center gap-3 transition-all duration-300"
+                            className="bg-orange-50 hover:bg-orange-100 border-2 border-orange-200 hover:border-orange-300 rounded-2xl p-5 flex flex-col items-center gap-2 transition-all duration-200"
                         >
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center shadow-lg shadow-orange-500/30">
-                                <Video className="w-7 h-7 text-white" />
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center shadow-md">
+                                <Video className="w-6 h-6 text-white" />
                             </div>
-                            <span className="text-white font-semibold">Video</span>
-                            <span className="text-white/50 text-xs">Camera on</span>
-                        </motion.button>
+                            <span className="text-gray-800 font-semibold text-sm">Video</span>
+                            <span className="text-gray-500 text-xs">Camera on</span>
+                        </button>
                     </div>
 
                     {/* Cancel Button */}
                     <button
                         onClick={onClose}
-                        className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium transition-colors"
+                        className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 font-medium transition-colors"
                     >
                         Cancel
                     </button>
-
-                    {/* Decorative Elements */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent rounded-full" />
                 </motion.div>
             </motion.div>
         </AnimatePresence>
