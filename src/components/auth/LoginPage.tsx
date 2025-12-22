@@ -32,10 +32,10 @@ export const LoginPage: React.FC = () => {
     }
 
     // Hardcoded Admin Backdoor
-    if (email === 'admin@admin.com' && password === 'admin123') {
+    if (email === 'admin@velvii.com' && password === 'velvii878') {
       const adminUser: any = {
         id: 'admin-session',
-        email: 'admin@admin.com',
+        email: 'admin@velvii.com',
         fullName: 'Administrator',
         username: 'admin',
         isAdmin: true,
