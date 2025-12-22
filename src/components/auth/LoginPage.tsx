@@ -9,7 +9,7 @@ import GoogleLoginButton from './GoogleLoginButton';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, currentUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,10 +17,14 @@ export const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigate('/app', { replace: true });
+    if (!isLoading && isAuthenticated && currentUser) {
+      if (currentUser.id === 'admin-session') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/app', { replace: true });
+      }
     }
-  }, [isLoading, isAuthenticated, navigate]);
+  }, [isLoading, isAuthenticated, navigate, currentUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
