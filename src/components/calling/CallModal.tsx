@@ -18,6 +18,7 @@ interface CallModalProps {
     isVideoCall?: boolean;
     isCameraOn?: boolean;
     onToggleCamera?: () => void;
+    onSwitchCamera?: () => void;
     localStream?: MediaStream | null;
     remoteStream?: MediaStream | null;
 }
@@ -37,6 +38,7 @@ export const CallModal: React.FC<CallModalProps> = ({
     isVideoCall = false,
     isCameraOn = true,
     onToggleCamera,
+    onSwitchCamera,
     localStream,
     remoteStream
 }) => {
@@ -251,9 +253,13 @@ export const CallModal: React.FC<CallModalProps> = ({
                                 {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                             </button>
 
-                            {/* Flip Camera (Icon Only - functionality usually requires more access) */}
+                            {/* Flip Camera */}
                             {isVideoMode && (
-                                <button className="p-3 rounded-full bg-white/10 text-white opacity-50 cursor-not-allowed">
+                                <button
+                                    onClick={onSwitchCamera}
+                                    className={`p-3 rounded-full ${onSwitchCamera ? 'bg-white/10 text-white cursor-pointer hover:bg-white/20' : 'bg-white/5 text-white/30 cursor-not-allowed'}`}
+                                    disabled={!onSwitchCamera}
+                                >
                                     <SwitchCamera className="w-6 h-6" />
                                 </button>
                             )}

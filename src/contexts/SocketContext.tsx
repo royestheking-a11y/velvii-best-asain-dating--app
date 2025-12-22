@@ -20,7 +20,9 @@ interface SocketContextType {
     isVideoCall: boolean;
     isCameraOn: boolean;
     toggleCamera: () => void;
+    switchCamera: () => void;
     stream: MediaStream | null;
+    remoteStream: MediaStream | null;
     localVideoRef: React.RefObject<HTMLVideoElement | null>;
     remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
 }
@@ -779,6 +781,50 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
+    // Switch Camera (Front/Back)
+    const switchCamera = async () => {
+        if (!stream) return;
+
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) return;
+
+        // Determine new facing mode
+        let newFacingMode = 'user';
+        const settings = videoTrack.getSettings();
+        if (settings.facingMode === 'user') {
+            newFacingMode = 'environment';
+        }
+
+        try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: newFacingMode }
+            });
+            const newVideoTrack = newStream.getVideoTracks()[0];
+
+            if (connectionRef.current) {
+                // Replace track in peer connection
+                connectionRef.current.replaceTrack(videoTrack, newVideoTrack, stream);
+            }
+
+            // Replace track in local stream object
+            stream.removeTrack(videoTrack);
+            stream.addTrack(newVideoTrack);
+
+            // Stop the old track
+            videoTrack.stop();
+
+            // Force refresh local video element
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = null;
+                localVideoRef.current.srcObject = stream;
+            }
+
+        } catch (err) {
+            console.error("Error switching camera:", err);
+            toast.error("Unable to switch camera");
+        }
+    };
+
     // 3. Permission Response
     const acceptVoiceRequest = (targetUserId: string, matchId: string, requestId: string, onMessageUpdate?: (msg: Message) => void) => {
         // Send 'from' explicitly so server doesn't have to look it up
@@ -1069,7 +1115,9 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             isVideoCall,
             isCameraOn,
             toggleCamera,
+            switchCamera,
             stream,
+            remoteStream,
             localVideoRef,
             remoteVideoRef
         }}>
@@ -1107,6 +1155,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     isVideoCall={isVideoCall}
                     isCameraOn={isCameraOn}
                     onToggleCamera={toggleCamera}
+                    onSwitchCamera={switchCamera}
                     localStream={stream}
                     remoteStream={remoteStream}
                 />
