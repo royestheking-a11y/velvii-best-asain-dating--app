@@ -141,11 +141,11 @@ export const CallModal: React.FC<CallModalProps> = ({
                             </div>
                             <h2 className="text-2xl font-semibold mb-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-[90vw] px-4 text-center">{callerName}</h2>
                             <p className="text-white/60 text-lg flex items-center gap-2">
-                                {status === 'connected' ? (remoteStream ? formatTime(duration) : 'Connecting video...') : (
+                                {status === 'connected' ? ((isVideoMode && !remoteStream) ? 'Connecting video...' : formatTime(duration)) : (
                                     <>
                                         {status === 'outgoing' && 'Calling...'}
                                         {status === 'ringing' && 'Ringing...'}
-                                        {status === 'incoming' && 'Incoming video call...'}
+                                        {status === 'incoming' && (isVideoMode ? 'Incoming video call...' : 'Incoming voice call...')}
                                         {status === 'requesting' && 'Connecting...'}
                                     </>
                                 )}
@@ -210,7 +210,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                     {/* INCOMING CALL UI */}
                     {status === 'incoming' ? (
                         <div className="flex flex-col items-center gap-8">
-                            <p className="text-white/70">Swipe up to accept</p>
+                            <p className="text-white/70">Tap to accept</p>
                             <div className="flex w-full justify-between px-8">
                                 <div className="flex flex-col items-center gap-2">
                                     <button onClick={onReject} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mb-2">
@@ -220,7 +220,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                                 </div>
                                 <div className="flex flex-col items-center gap-2">
                                     <button onClick={onAnswer} className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-2 animate-bounce">
-                                        <Video className="w-8 h-8 fill-current" />
+                                        {isVideoMode ? <Video className="w-8 h-8 fill-current" /> : <Phone className="w-8 h-8 fill-current" />}
                                     </button>
                                     <span className="text-sm text-white/60">Accept</span>
                                 </div>
