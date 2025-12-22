@@ -28,15 +28,64 @@ export const MessagesPage: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Handle Socket Updates
+  // Handle Socket Updates - Real-time message updates
   useEffect(() => {
-    if (socket) {
-      const handleRefresh = () => loadData();
-      socket.on('receive-message', handleRefresh);
-      socket.on('update-message', handleRefresh);
+    if (socket && currentUser) {
+      // Handle new incoming messages - update lastMessage in conversations
+      const handleNewMessage = (data: any) => {
+        console.log('[MessagesPage] Received message update:', data);
+
+        // Update conversation's lastMessage in real-time
+        setConversations(prev => {
+          const matchIndex = prev.findIndex(c => c.match.id === data.matchId);
+
+          if (matchIndex >= 0) {
+            // Update existing conversation
+            const updated = [...prev];
+            updated[matchIndex] = {
+              ...updated[matchIndex],
+              lastMessage: data
+            };
+            // Re-sort by latest message
+            return updated.sort((a, b) =>
+              new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+            );
+          } else {
+            // New conversation - do a full reload
+            loadData();
+            return prev;
+          }
+        });
+      };
+
+      // Handle message updates (delete, read receipts, type changes)
+      const handleMessageUpdate = ({ messageId, updates }: any) => {
+        console.log('[MessagesPage] Message update received:', messageId, updates);
+
+        // If a message was deleted or its type changed, update the lastMessage if it's the one displayed
+        setConversations(prev => {
+          return prev.map(conv => {
+            // Check if this conversation's lastMessage is the one being updated
+            if (conv.lastMessage?.id === messageId || conv.lastMessage?._id === messageId) {
+              return {
+                ...conv,
+                lastMessage: {
+                  ...conv.lastMessage,
+                  ...updates
+                }
+              };
+            }
+            return conv;
+          });
+        });
+      };
+
+      socket.on('receive-message', handleNewMessage);
+      socket.on('update-message', handleMessageUpdate);
+
       return () => {
-        socket.off('receive-message', handleRefresh);
-        socket.off('update-message', handleRefresh);
+        socket.off('receive-message', handleNewMessage);
+        socket.off('update-message', handleMessageUpdate);
       };
     }
   }, [socket, currentUser]);
