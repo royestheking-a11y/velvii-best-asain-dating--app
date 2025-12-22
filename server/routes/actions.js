@@ -170,34 +170,9 @@ router.post('/like', async (req, res) => {
                 createdAt: new Date()
             });
 
-            // AI AUTO-REPLY RULE: If target is AI, send a greeting
-            if (targetUser && targetUser.isAI) {
-                const Message = require('../models/Message'); // Lazy import loop avoidance
-
-                // Pick a random greeting
-                const greetings = [
-                    "Hey! Thanks for the like 😊",
-                    "Hi there! Nice to match with you!",
-                    "Hello! How's your day going?",
-                    "Hey! I liked your profile 💫"
-                ];
-                const cleanGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-
-                const aiMsg = new Message({
-                    matchId: match.id, // Use the generated ID
-                    senderId: toUserId,
-                    receiverId: fromUserId,
-                    content: cleanGreeting,
-                    type: 'text',
-                    createdAt: new Date(),
-                    isRead: false
-                });
-                await aiMsg.save();
-
-                match.lastMessage = cleanGreeting;
-                match.lastMessageAt = new Date();
-                match.unreadCount1 = 1; // User has 1 unread message
-            }
+            // NOTE: AI users no longer send auto-greeting on match.
+            // They will only respond when the user messages them first.
+            // This makes the experience more realistic.
 
             await match.save();
 
