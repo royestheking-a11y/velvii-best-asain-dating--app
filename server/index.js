@@ -299,16 +299,25 @@ io.on("connection", (socket) => {
     // 1. Caller initiates call (Only after permission if enforced on client)
     // 1. Caller initiates call (Only after permission if enforced on client)
     socket.on("call-user", (data) => {
-        const { userToCall, signalData, from, name, image } = data; // Relaying image
-        const user = activeUsers.find((u) => u.userId === userToCall);
+        const { userToCall, signalData, from, name, image } = data;
+        const targetUser = activeUsers.find((u) => u.userId === userToCall);
+        const callerSocket = activeUsers.find((u) => u.userId === from);
 
         console.log(`Call from ${from} to ${userToCall}`);
 
-        if (user) {
-            io.to(user.socketId).emit("call-made", { signal: signalData, from, name, image }); // Passing image
+        if (targetUser) {
+            // User is ONLINE - deliver the call
+            io.to(targetUser.socketId).emit("call-made", { signal: signalData, from, name, image });
+
+            // Notify caller that their call is ringing on recipient's device
+            if (callerSocket) {
+                io.to(callerSocket.socketId).emit("call-ringing", { to: userToCall });
+            }
         } else {
-            // User offline
-            // Maybe emit "user-offline"
+            // User is OFFLINE - notify caller
+            if (callerSocket) {
+                io.to(callerSocket.socketId).emit("user-offline", { to: userToCall });
+            }
         }
     });
 

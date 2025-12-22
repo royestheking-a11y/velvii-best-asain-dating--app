@@ -90,7 +90,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [onlineUsers, setOnlineUsers] = useState<{ userId: string; socketId: string }[]>([]);
 
     // Call State
-    const [callStatus, setCallStatus] = useState<'idle' | 'requesting' | 'incoming_request' | 'incoming' | 'outgoing' | 'connected'>('idle');
+    const [callStatus, setCallStatus] = useState<'idle' | 'requesting' | 'incoming_request' | 'incoming' | 'outgoing' | 'ringing' | 'connected'>('idle');
     const [isMinimized, setIsMinimized] = useState(false);
 
     // Timer
@@ -276,6 +276,19 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 stopRingtone(); // Stop ringing
                 // Removed playSound('connect')
                 connectionRef.current?.signal(signal);
+            });
+
+            // When call is delivered to recipient (they are online)
+            newSocket.on('call-ringing', () => {
+                console.log('[CallDebug] Call is ringing on recipient device');
+                setCallStatus('ringing');
+            });
+
+            // When recipient is offline
+            newSocket.on('user-offline', () => {
+                console.log('[CallDebug] User is offline');
+                toast.error('User is offline', { duration: 3000 });
+                // Keep showing "Calling..." - they might come online
             });
 
             newSocket.on('ice-candidate', ({ candidate }) => {

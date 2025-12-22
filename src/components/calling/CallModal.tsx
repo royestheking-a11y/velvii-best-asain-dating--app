@@ -3,7 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, Video, MessageCircle, Volume2, VolumeX, S
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CallModalProps {
-    status: 'idle' | 'requesting' | 'incoming_request' | 'incoming' | 'outgoing' | 'connected';
+    status: 'idle' | 'requesting' | 'incoming_request' | 'incoming' | 'outgoing' | 'ringing' | 'connected';
     callerName: string;
     callerImage: string;
     onAnswer: () => void;
@@ -95,7 +95,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                         className="relative mb-8"
                     >
                         {/* Animation for Calling/Ringing */}
-                        {(status === 'outgoing' || status === 'incoming') && (
+                        {(status === 'outgoing' || status === 'ringing' || status === 'incoming') && (
                             <>
                                 <div className="absolute inset-0 bg-white/10 rounded-full animate-ping duration-[2000ms]" />
                                 <div className="absolute inset-0 bg-white/5 rounded-full animate-ping duration-[2000ms] delay-500" />
@@ -122,6 +122,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                             <p className="text-white/70 text-xl font-medium animate-pulse">
                                 {status === 'requesting' && 'Requesting permission...'}
                                 {status === 'outgoing' && 'Calling...'}
+                                {status === 'ringing' && 'Ringing...'}
                                 {status === 'incoming' && 'Incoming Call...'}
                             </p>
                         )}
