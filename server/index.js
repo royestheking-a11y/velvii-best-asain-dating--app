@@ -42,7 +42,16 @@ if (publicVapidKey && privateVapidKey) {
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://velviiorg_db_user:lvqyDCYBapnMa67y@cluster0.hbnzuhp.mongodb.net/VelviiDB?appName=Cluster0";
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("✅ MongoDB Connected"))
+    .then(async () => {
+        console.log("✅ MongoDB Connected");
+        try {
+            const User = require('./models/User');
+            const count = await User.countDocuments({});
+            console.log(`[STARTUP] Found ${count} users in the database.`);
+        } catch (e) {
+            console.error("[STARTUP] Failed to count users:", e);
+        }
+    })
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
 // Routes
