@@ -530,7 +530,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (resolvedMatchId) setCurrentMatchId(resolvedMatchId);
             setIsMinimized(false);
 
-            startActualCall(userId);
+            startActualCall(userId, isVideo);
         } else {
             // Dynamic Check: Maybe backend knows it's allowed (User B accepted) but local is stale
             let serverPerm = false;
@@ -557,7 +557,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                         if (resolvedMatchId) setCurrentMatchId(resolvedMatchId);
                         setIsMinimized(false);
 
-                        startActualCall(userId);
+                        startActualCall(userId, isVideo);
                         return;
                     }
                 } catch (e) {
@@ -610,11 +610,11 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     // 1. Start Actual Call (Outgoing)
-    const startActualCall = async (userId: string) => {
+    const startActualCall = async (userId: string, isVideoMode: boolean) => {
         setCallStatus('outgoing');
         playRingtone('outgoing'); // Play Ringback
 
-        const currentStream = await getMedia(isVideoCall);
+        const currentStream = await getMedia(isVideoMode);
         if (!currentStream || !socket) return;
 
         // ICE servers with STUN + free TURN for better connectivity
@@ -648,7 +648,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 from: currentUser?.id,
                 name: currentUser?.fullName,
                 image: userPhoto,
-                isVideoCall: isVideoCall // Pass video call flag
+                isVideoCall: isVideoMode // Pass video call flag explicitly
             });
         });
 
