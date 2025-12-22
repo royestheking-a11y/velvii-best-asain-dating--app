@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, MessageCircle, Volume2, ShieldCheck } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, MessageCircle, Volume2, ShieldCheck, ChevronDown, Camera, SwitchCamera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CallModalProps {
@@ -65,7 +65,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             localVideoRef.current.muted = true;
             localVideoRef.current.play().catch(() => { });
         }
-    }, [localStream]);
+    }, [localStream, status]); // Added status to ensure retry on connection
 
     // Handle remote video stream
     useEffect(() => {
@@ -73,23 +73,20 @@ export const CallModal: React.FC<CallModalProps> = ({
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch(() => { });
         }
-    }, [remoteStream]);
+    }, [remoteStream, status]);
 
-    // Listen for remote video stream event
+    // Force refresh streams if they exist but aren't playing (Mobile Safari fix)
     useEffect(() => {
-        const handleRemoteStream = (e: CustomEvent) => {
-            console.log('[CallModal] Received remote video stream');
-            if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = e.detail;
+        const checkStreams = setInterval(() => {
+            if (localVideoRef.current && localStream && localVideoRef.current.paused) {
+                localVideoRef.current.play().catch(() => { });
+            }
+            if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.paused) {
                 remoteVideoRef.current.play().catch(() => { });
             }
-        };
-
-        window.addEventListener('remote-video-stream', handleRemoteStream as EventListener);
-        return () => {
-            window.removeEventListener('remote-video-stream', handleRemoteStream as EventListener);
-        };
-    }, []);
+        }, 2000);
+        return () => clearInterval(checkStreams);
+    }, [localStream, remoteStream]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -99,39 +96,69 @@ export const CallModal: React.FC<CallModalProps> = ({
 
     if (status === 'idle') return null;
 
-    const showVideoUI = isVideoCall && status === 'connected';
+    const isVideoMode = isVideoCall;
+    const isConnected = status === 'connected';
 
+    // WhatsApp Style Layout
     return (
         <AnimatePresence>
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col overflow-hidden"
+                initial={{ opacity: 0, y: '100%' }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: '100%' }}
+                className="fixed inset-0 z-[9999] bg-[#0b141a] text-white overflow-hidden flex flex-col"
             >
-                {/* Video Call - Remote Video Background */}
-                {showVideoUI && (
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-cover"
-                    />
-                )}
+                {/* --- LAYER 1: BACKGROUND / REMOTE VIDEO --- */}
+                <div className="absolute inset-0 z-0">
+                    {/* Remote Video (Only if connected & video mode & stream exists) */}
+                    {isVideoMode && isConnected && remoteStream && (
+                        <video
+                            ref={remoteVideoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
+                        />
+                    )}
 
-                {/* Voice Call / Pre-connected Background */}
-                {!showVideoUI && (
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-900" />
-                )}
+                    {/* Dark Background + Avatar (If not connected OR voice mode OR waiting for stream) */}
+                    {(!isVideoMode || !isConnected || !remoteStream) && (
+                        <div className="w-full h-full flex flex-col items-center pt-24 bg-[#0b141a]">
+                            <div className="relative mb-6">
+                                {(status === 'ringing' || status === 'incoming' || status === 'outgoing') && (
+                                    <>
+                                        <div className="absolute inset-0 bg-white/10 rounded-full animate-ping duration-[2000ms]" />
+                                        <div className="absolute inset-0 bg-white/5 rounded-full animate-ping duration-[2000ms] delay-500" />
+                                    </>
+                                )}
+                                <img
+                                    src={callerImage}
+                                    alt={callerName}
+                                    className="w-32 h-32 rounded-full object-cover border-2 border-white/20 relative z-10"
+                                />
+                            </div>
+                            <h2 className="text-2xl font-semibold mb-2">{callerName}</h2>
+                            <p className="text-white/60 text-lg flex items-center gap-2">
+                                {status === 'connected' ? (remoteStream ? formatTime(duration) : 'Connecting video...') : (
+                                    <>
+                                        {status === 'outgoing' && 'Calling...'}
+                                        {status === 'ringing' && 'Ringing...'}
+                                        {status === 'incoming' && 'Incoming video call...'}
+                                        {status === 'requesting' && 'Connecting...'}
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                    )}
+                </div>
 
-                {/* Overlay for video calls */}
-                {showVideoUI && (
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
-                )}
-
-                {/* Local Video PIP */}
-                {showVideoUI && (
-                    <div className="absolute top-16 right-4 z-20 w-24 h-32 rounded-2xl overflow-hidden border-2 border-white/30 shadow-xl bg-black">
+                {/* --- LAYER 2: LOCAL VIDEO PIP --- */}
+                {/* WhatsApp style: Vertical rectangle, bottom right (usually) */}
+                {isVideoMode && (
+                    <motion.div
+                        drag
+                        dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                        className="absolute bottom-32 right-4 z-20 w-32 h-48 bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-white/10"
+                    >
                         {isCameraOn ? (
                             <video
                                 ref={localVideoRef}
@@ -141,170 +168,99 @@ export const CallModal: React.FC<CallModalProps> = ({
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                                <VideoOff className="w-6 h-6 text-white/50" />
+                            <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                                <VideoOff className="w-8 h-8 text-white/40" />
                             </div>
                         )}
-                    </div>
+                    </motion.div>
                 )}
 
-                {/* Top Bar */}
-                <div className="relative z-10 flex justify-between items-start pt-12 px-4">
-                    <button
-                        onClick={onMinimize}
-                        className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center"
-                    >
-                        <MessageCircle className="w-5 h-5" />
+                {/* --- LAYER 3: TOP HEADER --- */}
+                <div className="absolute top-0 left-0 right-0 z-30 pt-12 pb-4 px-4 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-start">
+                    <button onClick={onMinimize} className="p-2">
+                        <ChevronDown className="w-8 h-8 text-white" />
                     </button>
+
+                    {isVideoMode && isConnected && (
+                        <div className="flex flex-col items-center">
+                            <h3 className="font-semibold text-lg shadow-black drop-shadow-md">{callerName}</h3>
+                            <span className="text-sm text-white/80 shadow-black drop-shadow-md">{formatTime(duration)}</span>
+                        </div>
+                    )}
+
                     <div className="flex flex-col items-center">
-                        <div className="flex items-center gap-1.5 text-white/70 text-xs">
-                            <ShieldCheck className="w-3 h-3 text-green-400" />
-                            <span>Encrypted</span>
+                        <div className="flex items-center gap-1 text-[10px] text-white/60 mb-1 bg-black/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>End-to-end encrypted</span>
                         </div>
-                        {isVideoCall && (
-                            <div className="flex items-center gap-1 text-orange-400 text-xs mt-1">
-                                <Video className="w-3 h-3" />
-                                <span>Video Call</span>
-                            </div>
-                        )}
                     </div>
-                    <div className="w-10" />
                 </div>
 
-                {/* Center Content */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-4">
-                    {/* Profile Picture - Always show except during connected video call */}
-                    {!showVideoUI && (
-                        <>
-                            <div className="relative mb-6">
-                                {/* Pulse animation for ringing/incoming */}
-                                {(status === 'outgoing' || status === 'ringing' || status === 'incoming') && (
-                                    <>
-                                        <div className="absolute inset-0 bg-white/20 rounded-full animate-ping" />
-                                        <div className="absolute inset-0 bg-white/10 rounded-full animate-ping" style={{ animationDelay: '0.5s' }} />
-                                    </>
-                                )}
-                                {status === 'connected' && (
-                                    <div className="absolute -inset-1 bg-green-500/30 rounded-full animate-pulse" />
-                                )}
-                                <div className="w-36 h-36 rounded-full border-4 border-white/20 p-1 relative z-10 bg-slate-800">
-                                    <img src={callerImage} alt={callerName} className="w-full h-full rounded-full object-cover" />
-                                </div>
-                            </div>
+                {/* --- LAYER 4: BOTTOM CONTROLS --- */}
+                <div className="absolute bottom-0 left-0 right-0 z-30 bg-[#0b141a] px-6 py-8 rounded-t-3xl">
 
-                            <h2 className="text-3xl font-bold text-white mb-3 text-center">{callerName}</h2>
-
-                            {/* Status Text */}
-                            {status === 'connected' ? (
-                                <div className="text-2xl font-mono text-white">
-                                    {formatTime(duration)}
-                                </div>
-                            ) : (
-                                <p className="text-white/70 text-lg animate-pulse">
-                                    {status === 'requesting' && 'Requesting...'}
-                                    {status === 'outgoing' && (isVideoCall ? 'Video Calling...' : 'Calling...')}
-                                    {status === 'ringing' && 'Ringing...'}
-                                    {status === 'incoming' && (isVideoCall ? 'Incoming Video Call...' : 'Incoming Call...')}
-                                </p>
-                            )}
-                        </>
-                    )}
-
-                    {/* Video Call Connected - Name & Timer overlay */}
-                    {showVideoUI && (
-                        <div className="text-center">
-                            <h2 className="text-2xl font-bold text-white mb-2 drop-shadow-lg">{callerName}</h2>
-                            <div className="text-xl font-mono text-white/90 drop-shadow-lg">
-                                {formatTime(duration)}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Bottom Controls - Fixed with safe area */}
-                <div className="relative z-10 pb-8 pt-4 px-4 bg-gradient-to-t from-black/60 to-transparent">
+                    {/* INCOMING CALL UI */}
                     {status === 'incoming' ? (
-                        /* Incoming Call - Answer/Reject */
-                        <div className="flex justify-center gap-8">
-                            <div className="flex flex-col items-center gap-2">
-                                <button
-                                    onClick={onReject}
-                                    className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg"
-                                >
-                                    <PhoneOff className="w-7 h-7" />
-                                </button>
-                                <span className="text-white/70 text-xs">Decline</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-2">
-                                <button
-                                    onClick={onAnswer}
-                                    className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg animate-pulse"
-                                >
-                                    {isVideoCall ? <Video className="w-7 h-7" /> : <Phone className="w-7 h-7" />}
-                                </button>
-                                <span className="text-white/70 text-xs">Accept</span>
+                        <div className="flex flex-col items-center gap-8">
+                            <p className="text-white/70">Swipe up to accept</p>
+                            <div className="flex w-full justify-between px-8">
+                                <div className="flex flex-col items-center gap-2">
+                                    <button onClick={onReject} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mb-2">
+                                        <PhoneOff className="w-8 h-8 fill-current" />
+                                    </button>
+                                    <span className="text-sm text-white/60">Decline</span>
+                                </div>
+                                <div className="flex flex-col items-center gap-2">
+                                    <button onClick={onAnswer} className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-2 animate-bounce">
+                                        <Video className="w-8 h-8 fill-current" />
+                                    </button>
+                                    <span className="text-sm text-white/60">Accept</span>
+                                </div>
                             </div>
                         </div>
                     ) : (
-                        /* Outgoing/Connected - Control buttons */
-                        <div className="flex justify-center items-end gap-4">
-                            {/* Mute Button */}
-                            <div className="flex flex-col items-center gap-2">
-                                <button
-                                    onClick={onToggleMute}
-                                    disabled={status !== 'connected'}
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isMuted
-                                            ? 'bg-white text-black'
-                                            : 'bg-white/20 text-white'
-                                        } ${status !== 'connected' ? 'opacity-50' : ''}`}
-                                >
-                                    {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                                </button>
-                                <span className="text-white/70 text-xs">Mute</span>
-                            </div>
+                        /* CONNECTED / CALLING UI */
+                        <div className="flex justify-between items-center px-2">
+                            {/* Speaker */}
+                            <button
+                                onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+                                className={`p-3 rounded-full ${isSpeakerOn ? 'bg-white text-black' : 'bg-white/10 text-white'}`}
+                            >
+                                <Volume2 className="w-6 h-6" />
+                            </button>
 
-                            {/* Camera Button - Video calls only */}
-                            {isVideoCall && (
-                                <div className="flex flex-col items-center gap-2">
-                                    <button
-                                        onClick={onToggleCamera}
-                                        disabled={status !== 'connected'}
-                                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${!isCameraOn
-                                                ? 'bg-white text-black'
-                                                : 'bg-white/20 text-white'
-                                            } ${status !== 'connected' ? 'opacity-50' : ''}`}
-                                    >
-                                        {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                                    </button>
-                                    <span className="text-white/70 text-xs">Camera</span>
-                                </div>
+                            {/* Video Toggle */}
+                            {isVideoMode && (
+                                <button
+                                    onClick={onToggleCamera}
+                                    className={`p-3 rounded-full ${!isCameraOn ? 'bg-white text-black' : 'bg-white/10 text-white'}`}
+                                >
+                                    {isCameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                                </button>
                             )}
 
-                            {/* End Call Button - Larger, centered */}
-                            <div className="flex flex-col items-center gap-2">
-                                <button
-                                    onClick={onEnd}
-                                    className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg"
-                                >
-                                    <PhoneOff className="w-7 h-7" />
-                                </button>
-                                <span className="text-white/70 text-xs">End</span>
-                            </div>
+                            {/* Mute */}
+                            <button
+                                onClick={onToggleMute}
+                                className={`p-3 rounded-full ${isMuted ? 'bg-white text-black' : 'bg-white/10 text-white'}`}
+                            >
+                                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                            </button>
 
-                            {/* Speaker Button */}
-                            <div className="flex flex-col items-center gap-2">
-                                <button
-                                    onClick={() => setIsSpeakerOn(!isSpeakerOn)}
-                                    disabled={status !== 'connected'}
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isSpeakerOn
-                                            ? 'bg-white text-black'
-                                            : 'bg-white/20 text-white'
-                                        } ${status !== 'connected' ? 'opacity-50' : ''}`}
-                                >
-                                    <Volume2 className="w-5 h-5" />
+                            {/* Flip Camera (Icon Only - functionality usually requires more access) */}
+                            {isVideoMode && (
+                                <button className="p-3 rounded-full bg-white/10 text-white opacity-50 cursor-not-allowed">
+                                    <SwitchCamera className="w-6 h-6" />
                                 </button>
-                                <span className="text-white/70 text-xs">Speaker</span>
-                            </div>
+                            )}
+
+                            {/* End Call (Prominent) */}
+                            <button
+                                onClick={onEnd}
+                                className="w-14 h-14 rounded-full bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/20"
+                            >
+                                <PhoneOff className="w-7 h-7 fill-current" />
+                            </button>
                         </div>
                     )}
                 </div>
