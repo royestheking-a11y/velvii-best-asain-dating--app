@@ -352,8 +352,16 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     // Show Toast if NOT on the chat page for this user
                     // Simple check: if URL doesn't contain matchId (approximate)
                     if (!window.location.href.includes(data.matchId)) {
+                        // Determine notification text - show friendly message for images
+                        let notificationText = data.content;
+                        if (data.type === 'image' || (data.content && data.content.includes('cloudinary.com'))) {
+                            notificationText = 'Sent a photo 📷';
+                        } else if (data.content.length > 30) {
+                            notificationText = data.content.substring(0, 30) + '...';
+                        }
+
                         toast.info("New Message", {
-                            description: data.content.substring(0, 30) + (data.content.length > 30 ? '...' : ''),
+                            description: notificationText,
                             icon: '💬'
                         });
 
@@ -361,7 +369,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                         if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
                             try {
                                 new Notification("New Message", {
-                                    body: data.content,
+                                    body: notificationText,
                                     icon: '/pwa-192x192.png'
                                 });
                             } catch (e) { console.log("Notification error", e); }
