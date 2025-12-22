@@ -414,6 +414,22 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 updateMessage(messageId, updates);
             });
 
+            // --- CALL PERMISSION ACCEPTED LISTENER ---
+            // Fixes bidirectional bug where caller didn't know request was accepted
+            newSocket.on('voice-permission-accepted', ({ from }: any) => {
+                console.log(`[Socket] Permission accepted by ${from}`);
+                if (currentUser?.id) {
+                    // Update Local Storage immediately
+                    const permKey = `voice_perm_${currentUser.id}_${from}`;
+                    localStorage.setItem(permKey, 'true');
+
+                    toast.success("Call Request Accepted! ✅", {
+                        description: "You can now make voice and video calls.",
+                        duration: 4000
+                    });
+                }
+            });
+
             // Request Permission on Connect
             if ('Notification' in window && Notification.permission === 'default') {
                 try {
