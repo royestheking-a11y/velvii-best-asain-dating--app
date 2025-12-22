@@ -788,32 +788,43 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const videoTrack = stream.getVideoTracks()[0];
         if (!videoTrack) return;
 
-        // Determine new facing mode
-        let newFacingMode = 'user';
-        const settings = videoTrack.getSettings();
-        if (settings.facingMode === 'user') {
-            newFacingMode = 'environment';
-        }
-
         try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (videoDevices.length <= 1) {
+                toast.info("Only one camera available");
+                return;
+            }
+
+            const currentSettings = videoTrack.getSettings();
+            const currentDeviceId = currentSettings.deviceId;
+
+            const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
+            const nextIndex = (currentIndex + 1) % videoDevices.length;
+            const nextDevice = videoDevices[nextIndex];
+
+            // CRITICAL: Stop the old track FIRST to release hardware lock on mobile
+            videoTrack.stop();
+            stream.removeTrack(videoTrack);
+
+            console.log(`[CameraSwitch] Switching to ${nextDevice.label}`);
+
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacingMode }
+                video: { deviceId: { exact: nextDevice.deviceId } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
 
-            if (connectionRef.current) {
-                // Replace track in peer connection
-                connectionRef.current.replaceTrack(videoTrack, newVideoTrack, stream);
-            }
-
-            // Replace track in local stream object
-            stream.removeTrack(videoTrack);
             stream.addTrack(newVideoTrack);
 
-            // Stop the old track
-            videoTrack.stop();
+            if (connectionRef.current) {
+                try {
+                    connectionRef.current.replaceTrack(videoTrack, newVideoTrack, stream);
+                } catch (e) {
+                    console.warn("replaceTrack failed", e);
+                }
+            }
 
-            // Force refresh local video element
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
                 localVideoRef.current.srcObject = stream;
@@ -823,6 +834,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             console.error("Error switching camera:", err);
             toast.error("Unable to switch camera");
         }
+
     };
 
     // 3. Permission Response
