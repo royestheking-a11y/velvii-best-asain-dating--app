@@ -13,6 +13,7 @@ app.use(cors({
         'http://localhost:5173',
         'http://localhost:5174',
         'https://velvii-best-asain-dating-app.vercel.app',
+        'https://velvii.vercel.app',  // Production frontend
         process.env.FRONTEND_URL, // Vercel deployment URL
         process.env.VITE_API_URL  // Just in case
     ].filter(Boolean), // Remove undefined
