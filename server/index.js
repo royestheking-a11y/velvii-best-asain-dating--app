@@ -63,6 +63,7 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/actions', require('./routes/actions'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/upload', require('./routes/upload')); // Generic image upload
 
 const server = http.createServer(app);
 
@@ -175,9 +176,15 @@ io.on("connection", (socket) => {
             const subscriptions = await Subscription.find({ userId: to });
 
             if (subscriptions.length > 0) {
+                // Determine notification body - show friendly text for images
+                let notificationBody = data.content;
+                if (data.type === 'image' || (data.content && data.content.includes('cloudinary.com'))) {
+                    notificationBody = 'Sent a photo 📷';
+                }
+
                 const payload = JSON.stringify({
                     title: data.senderName || 'New Message',
-                    body: data.content,
+                    body: notificationBody,
                     icon: '/pwa-192x192.png',
                     url: `/messages/${data.matchId}`
                 });

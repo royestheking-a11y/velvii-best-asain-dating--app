@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, Message } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { messages as apiMessages } from '@/services/api';
+import { messages as apiMessages, upload as apiUpload } from '@/services/api';
 import { formatMessageTime, generateId, compressImage } from '@/utils/helpers';
 import { getLastSeenText } from '@/utils/dateUtils';
 import { toast } from 'sonner';
@@ -268,18 +268,23 @@ export const ChatPage: React.FC = () => {
     if (!file || !currentUser) return;
 
     try {
-      const compressedImage = await compressImage(file);
-      // In a real app, upload to Cloudinary first via api.users.uploadPhoto (or specific message upload)
-      // For now, sending base64/url directly if compressedImage is such.
-      // Ideally: 
-      // const { url } = await api.upload(file);
+      toast.loading('Uploading image...', { id: 'image-upload' });
 
+      // 1. Compress the image
+      const compressedImage = await compressImage(file);
+
+      // 2. Upload to Cloudinary first (returns URL)
+      const imageUrl = await apiUpload.image(compressedImage);
+
+      toast.dismiss('image-upload');
+
+      // 3. Create message with Cloudinary URL (not base64)
       const messageData: Partial<Message> = {
         matchId,
         senderId: currentUser.id,
         receiverId: otherUser.id,
         type: 'image',
-        content: compressedImage, // This might be large base64? prefer URL.
+        content: imageUrl, // Now a Cloudinary URL, not base64
       };
 
       const sentMessage = await apiMessages.send(messageData);
@@ -289,10 +294,15 @@ export const ChatPage: React.FC = () => {
         socket.emit('send-message', {
           ...sentMessage,
           to: otherUser.id,
-          isAI: otherUser.isAI
+          isAI: otherUser.isAI,
+          senderName: currentUser.fullName
         });
       }
+
+      toast.success('Image sent!');
     } catch (error) {
+      toast.dismiss('image-upload');
+      console.error('Image upload error:', error);
       toast.error('Failed to upload image');
     }
   };

@@ -308,4 +308,12 @@ export const subscriptions = {
     }
 };
 
+// Generic upload for images (returns Cloudinary URL)
+export const upload = {
+    image: async (base64Data: string): Promise<string> => {
+        const response = await api.post('/upload', { image: base64Data });
+        return response.data.url;
+    }
+};
+
 export default api;
