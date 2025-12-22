@@ -101,10 +101,16 @@ io.on("connection", (socket) => {
         console.log(`User Registered: ${newUserId} -> ${socket.id}`);
         broadcastUsers();
 
+        // Check if Admin Session (Skip DB update)
+        if (newUserId === 'admin-session') return;
+
         // Update DB: Online
         try {
             const User = require('./models/User');
-            await User.findByIdAndUpdate(newUserId, { isOnline: true });
+            // Ensure ID is valid ObjectId if needed, though 'admin-session' is main culprit
+            if (mongoose.Types.ObjectId.isValid(newUserId)) {
+                await User.findByIdAndUpdate(newUserId, { isOnline: true });
+            }
         } catch (err) {
             console.error("Error updating online status:", err);
         }
@@ -119,13 +125,19 @@ io.on("connection", (socket) => {
 
         if (user) {
             console.log(`User Disconnected: ${user.userId}`);
+
+            // Skip DB Update for Admin Session
+            if (user.userId === 'admin-session') return;
+
             // Update DB: Offline + Last Active
             try {
                 const User = require('./models/User');
-                await User.findByIdAndUpdate(user.userId, {
-                    isOnline: false,
-                    lastActive: new Date()
-                });
+                if (mongoose.Types.ObjectId.isValid(user.userId)) {
+                    await User.findByIdAndUpdate(user.userId, {
+                        isOnline: false,
+                        lastActive: new Date()
+                    });
+                }
             } catch (err) {
                 console.error("Error updating offline status:", err);
             }
