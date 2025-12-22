@@ -564,11 +564,21 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const currentStream = await getMedia();
         if (!currentStream || !socket) return;
 
+        // ICE servers with STUN + free TURN for better connectivity
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            // Free TURN servers (Metered.ca - limited but works for testing)
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+        ];
+
         const peer = new Peer({
             initiator: true,
-            trickle: false,
+            trickle: true, // Enable trickle ICE for faster connection
             stream: currentStream,
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+            config: { iceServers }
         });
 
         peer.on('signal', (data) => {
@@ -606,10 +616,20 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setCallStatus('connected');
         setIsMinimized(false);
 
+        // Use same ICE servers for answerer
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+        ];
+
         const peer = new Peer({
             initiator: false,
-            trickle: false,
+            trickle: true,
             stream: currentStream,
+            config: { iceServers }
         });
 
         peer.on('signal', (data) => {
@@ -626,9 +646,32 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // Helper: Play Remote Audio
     const playRemoteAudio = (userStream: MediaStream) => {
-        const audio = new Audio();
+        // Create audio element
+        const audio = document.createElement('audio');
         audio.srcObject = userStream;
-        audio.play();
+        audio.autoplay = true;
+        audio.setAttribute('playsinline', 'true'); // Use setAttribute for cross-browser compatibility
+
+        // Attach to DOM (some browsers require this)
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+
+        // Play with error handling
+        audio.play()
+            .then(() => {
+                console.log('[CallDebug] Remote audio playing successfully');
+            })
+            .catch((err) => {
+                console.error('[CallDebug] Audio play failed:', err);
+                // Retry with user interaction hint
+                toast.info('Tap to unmute call audio', {
+                    action: {
+                        label: 'Unmute',
+                        onClick: () => audio.play()
+                    }
+                });
+            });
+
         remoteAudioRef.current = audio;
     };
 
@@ -709,9 +752,14 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsMinimized(false);
         setCallDuration(0);
 
-        // Clear refs
+        // Clear refs and remove audio from DOM
         if (remoteAudioRef.current) {
+            remoteAudioRef.current.pause();
             remoteAudioRef.current.srcObject = null;
+            // Remove from DOM if it was appended
+            if (remoteAudioRef.current.parentNode) {
+                remoteAudioRef.current.parentNode.removeChild(remoteAudioRef.current);
+            }
             remoteAudioRef.current = null;
         }
 
