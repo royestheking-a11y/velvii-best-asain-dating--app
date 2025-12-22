@@ -38,7 +38,7 @@ export const LandingPage: React.FC = () => {
           </h1>
 
           <p className="text-xl md:text-2xl mb-8 text-white/90 max-w-2xl mx-auto">
-            Where Connections Feel Premium
+            Meet Singles Near You
           </p>
 
           <motion.button
@@ -61,7 +61,7 @@ export const LandingPage: React.FC = () => {
           <FeatureCard
             icon={<Sparkles className="w-8 h-8" />}
             title="Smart Matching"
-            description="AI-powered algorithm to find your perfect match"
+            description="AI-powered matching that understands your vibe, not just your profile."
           />
           <FeatureCard
             icon={<Shield className="w-8 h-8" />}
@@ -87,7 +87,7 @@ export const LandingPage: React.FC = () => {
             <div className="text-white/80">Active Users</div>
           </div>
           <div>
-            <div className="text-4xl mb-2">50M+</div>
+            <div className="text-4xl mb-2">40M+</div>
             <div className="text-white/80">Matches Made</div>
           </div>
           <div>
