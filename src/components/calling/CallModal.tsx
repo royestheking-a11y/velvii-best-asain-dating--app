@@ -125,7 +125,7 @@ export const CallModal: React.FC<CallModalProps> = ({
 
                     {/* Dark Background + Avatar (If not connected OR voice mode OR waiting for stream) */}
                     {(!isVideoMode || !isConnected || !remoteStream) && (
-                        <div className="w-full h-full flex flex-col items-center pt-24 bg-[#0b141a]">
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0f172a]" style={{ backgroundColor: '#0f172a' }}>
                             <div className="relative mb-6">
                                 {(status === 'ringing' || status === 'incoming' || status === 'outgoing') && (
                                     <>
@@ -179,23 +179,30 @@ export const CallModal: React.FC<CallModalProps> = ({
                 )}
 
                 {/* --- LAYER 3: TOP HEADER --- */}
-                <div className="absolute top-0 left-0 right-0 z-30 pt-12 pb-4 px-4 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-start">
-                    <button onClick={onMinimize} className="p-2">
-                        <ChevronDown className="w-8 h-8 text-white" />
-                    </button>
+                {/* --- LAYER 3: TOP HEADER --- */}
+                <div className="absolute top-0 left-0 right-0 z-30 pt-12 pb-4 px-4 bg-gradient-to-b from-black/60 to-transparent grid grid-cols-3 items-start">
+                    <div className="flex justify-start">
+                        <button onClick={onMinimize} className="p-2">
+                            <ChevronDown className="w-8 h-8 text-white" />
+                        </button>
+                    </div>
 
-                    {isVideoMode && isConnected && (
-                        <div className="flex flex-col items-center">
-                            <h3 className="font-semibold text-lg shadow-black drop-shadow-md">{callerName}</h3>
-                            <span className="text-sm text-white/80 shadow-black drop-shadow-md">{formatTime(duration)}</span>
-                        </div>
-                    )}
-
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-center pt-1">
                         <div className="flex items-center gap-1 text-[10px] text-white/60 mb-1 bg-black/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
                             <ShieldCheck className="w-3 h-3" />
                             <span>End-to-end encrypted</span>
                         </div>
+
+                        {isVideoMode && isConnected && (
+                            <div className="flex flex-col items-center mt-1">
+                                <h3 className="font-semibold text-lg shadow-black drop-shadow-md">{callerName}</h3>
+                                <span className="text-sm text-white/80 shadow-black drop-shadow-md">{formatTime(duration)}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end">
+                        {/* Spacer for grid balance */}
                     </div>
                 </div>
 
