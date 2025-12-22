@@ -52,7 +52,17 @@ const smartFetch = async <T>(key: string, fetchFn: () => Promise<T>, ttl = 5 * 6
 
     // No cache, fetch normally
     const data = await fetchFn();
-    localStorage.setItem(`cache_${key}`, JSON.stringify({ data, timestamp: now }));
+    try {
+        localStorage.setItem(`cache_${key}`, JSON.stringify({ data, timestamp: now }));
+    } catch (e) {
+        console.warn(`[Cache] Failed to cache key "${key}" - Storage Full?`, e);
+        // Optional: Attempt to clear generic old keys if critical
+        try {
+            // Clear some generic large caches to free space
+            localStorage.removeItem('cache_admin_users_list');
+            localStorage.removeItem('cache_users_feed');
+        } catch (cleanupErr) { /* ignore */ }
+    }
     return data;
 };
 
