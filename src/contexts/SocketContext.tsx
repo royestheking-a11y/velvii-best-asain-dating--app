@@ -127,6 +127,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Video Call State
     const [isVideoCall, setIsVideoCall] = useState(false);
     const [isCameraOn, setIsCameraOn] = useState(true);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
     // Refs
     const connectionRef = useRef<Peer.Instance | null>(null);
@@ -740,19 +741,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // Helper: Play Remote Video
     const playRemoteVideo = (userStream: MediaStream) => {
-        // For video calls, we dispatch an event with the stream
-        // The CallModal will handle displaying the video
-        console.log('[CallDebug] Remote video stream received');
+        console.log('[CallDebug] Remote video stream received, storing for UI');
 
-        // Store the stream in a way the Modal can access
-        if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = userStream;
-            remoteVideoRef.current.play().catch(err => {
-                console.error('[CallDebug] Video play failed:', err);
-            });
-        }
+        // Store the remote stream in state so CallModal can access it
+        setRemoteStream(userStream);
 
-        // Also play audio from the stream
+        // Also play audio from the stream (video element in CallModal will handle video)
         const audio = document.createElement('audio');
         audio.srcObject = userStream;
         audio.autoplay = true;
@@ -761,7 +755,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         audio.play().catch(() => { });
         remoteAudioRef.current = audio;
 
-        // Dispatch custom event for UI to pick up the stream
+        // Dispatch custom event as backup for UI to pick up the stream
         window.dispatchEvent(new CustomEvent('remote-video-stream', { detail: userStream }));
     };
 
@@ -861,9 +855,12 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         connectionRef.current?.destroy();
         stream?.getTracks().forEach(track => track.stop());
         setStream(null);
+        setRemoteStream(null);
         setCallStatus('idle');
         setIsMinimized(false);
         setCallDuration(0);
+        setIsVideoCall(false);
+        setIsCameraOn(true);
 
         // Clear refs and remove audio from DOM
         if (remoteAudioRef.current) {
@@ -1111,6 +1108,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     isCameraOn={isCameraOn}
                     onToggleCamera={toggleCamera}
                     localStream={stream}
+                    remoteStream={remoteStream}
                 />
             )}
         </SocketContext.Provider>
