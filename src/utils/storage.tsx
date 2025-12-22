@@ -245,6 +245,11 @@ export const addMessage = (message: Message): void => {
     };
     setAllMatches(matches);
   }
+
+  // Dispatch custom event to notify UI components
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('message-added', { detail: message }));
+  }
 };
 
 export const getMessagesForMatch = (matchId: string): Message[] => {
@@ -280,6 +285,13 @@ export const updateMessage = (messageId: string, updates: Partial<Message>): voi
   if (index !== -1) {
     messages[index] = { ...messages[index], ...updates };
     setAllMessages(messages);
+
+    // Dispatch custom event to notify UI components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('message-updated', {
+        detail: { messageId, updates, message: messages[index] }
+      }));
+    }
   }
 };
 

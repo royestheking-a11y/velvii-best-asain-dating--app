@@ -28,56 +28,19 @@ export const MessagesPage: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Handle Socket Updates - Real-time message updates
+  // Handle Socket Updates - Real-time message updates from OTHER users
   useEffect(() => {
     if (socket && currentUser) {
       // Handle new incoming messages - update lastMessage in conversations
       const handleNewMessage = (data: any) => {
-        console.log('[MessagesPage] Received message update:', data);
-
-        // Update conversation's lastMessage in real-time
-        setConversations(prev => {
-          const matchIndex = prev.findIndex(c => c.match.id === data.matchId);
-
-          if (matchIndex >= 0) {
-            // Update existing conversation
-            const updated = [...prev];
-            updated[matchIndex] = {
-              ...updated[matchIndex],
-              lastMessage: data
-            };
-            // Re-sort by latest message
-            return updated.sort((a, b) =>
-              new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-            );
-          } else {
-            // New conversation - do a full reload
-            loadData();
-            return prev;
-          }
-        });
+        console.log('[MessagesPage] Received socket message:', data);
+        updateConversationWithMessage(data);
       };
 
       // Handle message updates (delete, read receipts, type changes)
       const handleMessageUpdate = ({ messageId, updates }: any) => {
-        console.log('[MessagesPage] Message update received:', messageId, updates);
-
-        // If a message was deleted or its type changed, update the lastMessage if it's the one displayed
-        setConversations(prev => {
-          return prev.map(conv => {
-            // Check if this conversation's lastMessage is the one being updated
-            if (conv.lastMessage?.id === messageId || conv.lastMessage?._id === messageId) {
-              return {
-                ...conv,
-                lastMessage: {
-                  ...conv.lastMessage,
-                  ...updates
-                }
-              };
-            }
-            return conv;
-          });
-        });
+        console.log('[MessagesPage] Socket message update:', messageId, updates);
+        updateConversationWithMessageUpdate(messageId, updates);
       };
 
       socket.on('receive-message', handleNewMessage);
@@ -89,6 +52,69 @@ export const MessagesPage: React.FC = () => {
       };
     }
   }, [socket, currentUser]);
+
+  // Handle LOCAL message events (for messages YOU create - call logs, missed calls, etc.)
+  useEffect(() => {
+    const handleLocalMessageAdded = (e: CustomEvent) => {
+      console.log('[MessagesPage] Local message added:', e.detail);
+      updateConversationWithMessage(e.detail);
+    };
+
+    const handleLocalMessageUpdated = (e: CustomEvent) => {
+      console.log('[MessagesPage] Local message updated:', e.detail);
+      const { messageId, updates } = e.detail;
+      updateConversationWithMessageUpdate(messageId, updates);
+    };
+
+    window.addEventListener('message-added', handleLocalMessageAdded as EventListener);
+    window.addEventListener('message-updated', handleLocalMessageUpdated as EventListener);
+
+    return () => {
+      window.removeEventListener('message-added', handleLocalMessageAdded as EventListener);
+      window.removeEventListener('message-updated', handleLocalMessageUpdated as EventListener);
+    };
+  }, []);
+
+  // Helper: Update conversation with a new message
+  const updateConversationWithMessage = (data: any) => {
+    setConversations(prev => {
+      const matchIndex = prev.findIndex(c => c.match.id === data.matchId);
+
+      if (matchIndex >= 0) {
+        const updated = [...prev];
+        updated[matchIndex] = {
+          ...updated[matchIndex],
+          lastMessage: data
+        };
+        // Re-sort by latest message
+        return updated.sort((a, b) =>
+          new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+        );
+      } else {
+        // New conversation - do a full reload
+        loadData();
+        return prev;
+      }
+    });
+  };
+
+  // Helper: Update conversation with message updates
+  const updateConversationWithMessageUpdate = (messageId: string, updates: any) => {
+    setConversations(prev => {
+      return prev.map(conv => {
+        if (conv.lastMessage?.id === messageId || conv.lastMessage?._id === messageId) {
+          return {
+            ...conv,
+            lastMessage: {
+              ...conv.lastMessage,
+              ...updates
+            }
+          };
+        }
+        return conv;
+      });
+    });
+  };
 
   const loadData = async () => {
     if (!currentUser) return;
