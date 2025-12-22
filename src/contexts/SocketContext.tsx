@@ -841,7 +841,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             // Rejected the call by ME (the callee)
             socket?.emit('reject-call', { to: _otherUserId });
         }
-        else if (callStatus === 'outgoing' || callStatus === 'requesting') {
+        else if (callStatus === 'outgoing' || callStatus === 'ringing' || callStatus === 'requesting') {
             // Cancelled by ME (the caller) -> Missed Call for THEM
             const missedMsg: Message = {
                 id: generateId(),
@@ -884,7 +884,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // TIMEOUT LOGIC
     useEffect(() => {
         let timeout: NodeJS.Timeout;
-        if (callStatus === 'requesting' || callStatus === 'outgoing') {
+        if (callStatus === 'requesting' || callStatus === 'outgoing' || callStatus === 'ringing') {
             // 30s Timeout for Caller
             timeout = setTimeout(() => {
                 toast.error("User is not answering...");
