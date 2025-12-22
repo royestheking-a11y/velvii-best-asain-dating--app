@@ -125,7 +125,7 @@ export const CallModal: React.FC<CallModalProps> = ({
 
                     {/* Dark Background + Avatar (If not connected OR voice mode OR waiting for stream) */}
                     {(!isVideoMode || !isConnected || !remoteStream) && (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0f172a]" style={{ backgroundColor: '#0f172a' }}>
+                        <div className="w-full h-full flex flex-col items-center justify-start pt-40 bg-[#0f172a]" style={{ backgroundColor: '#0f172a' }}>
                             <div className="relative mb-6">
                                 {(status === 'ringing' || status === 'incoming' || status === 'outgoing') && (
                                     <>
@@ -139,7 +139,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                                     className="w-32 h-32 rounded-full object-cover border-2 border-white/20 relative z-10"
                                 />
                             </div>
-                            <h2 className="text-2xl font-semibold mb-2">{callerName}</h2>
+                            <h2 className="text-2xl font-semibold mb-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-[90vw] px-4 text-center">{callerName}</h2>
                             <p className="text-white/60 text-lg flex items-center gap-2">
                                 {status === 'connected' ? (remoteStream ? formatTime(duration) : 'Connecting video...') : (
                                     <>
@@ -179,7 +179,6 @@ export const CallModal: React.FC<CallModalProps> = ({
                 )}
 
                 {/* --- LAYER 3: TOP HEADER --- */}
-                {/* --- LAYER 3: TOP HEADER --- */}
                 <div className="absolute top-0 left-0 right-0 z-30 pt-12 pb-4 px-4 bg-gradient-to-b from-black/60 to-transparent grid grid-cols-3 items-start">
                     <div className="flex justify-start">
                         <button onClick={onMinimize} className="p-2">
@@ -188,14 +187,10 @@ export const CallModal: React.FC<CallModalProps> = ({
                     </div>
 
                     <div className="flex flex-col items-center justify-center pt-1">
-                        <div className="flex items-center gap-1 text-[10px] text-white/60 mb-1 bg-black/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>End-to-end encrypted</span>
-                        </div>
 
                         {isVideoMode && isConnected && (
                             <div className="flex flex-col items-center mt-1">
-                                <h3 className="font-semibold text-lg shadow-black drop-shadow-md">{callerName}</h3>
+                                <h3 className="font-semibold text-lg shadow-black drop-shadow-md whitespace-nowrap overflow-hidden text-ellipsis max-w-[60vw]">{callerName}</h3>
                                 <span className="text-sm text-white/80 shadow-black drop-shadow-md">{formatTime(duration)}</span>
                             </div>
                         )}

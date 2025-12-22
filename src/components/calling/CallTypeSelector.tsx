@@ -75,8 +75,8 @@ export const CallTypeSelector: React.FC<CallTypeSelectorProps> = ({
                             onClick={onSelectVoice}
                             className="bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-300 rounded-2xl p-5 flex flex-col items-center gap-2 transition-all duration-200"
                         >
-                            <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center shadow-md">
-                                <Phone className="w-6 h-6 text-white" />
+                            <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shadow-md text-white">
+                                <Phone className="w-6 h-6" />
                             </div>
                             <span className="text-gray-800 font-semibold text-sm">Voice</span>
                             <span className="text-gray-500 text-xs">Audio only</span>
