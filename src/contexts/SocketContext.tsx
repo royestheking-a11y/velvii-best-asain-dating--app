@@ -576,7 +576,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         const peer = new Peer({
             initiator: true,
-            trickle: true, // Enable trickle ICE for faster connection
+            trickle: false, // Must be false - signaling not set up for trickle ICE
             stream: currentStream,
             config: { iceServers }
         });
@@ -627,7 +627,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         const peer = new Peer({
             initiator: false,
-            trickle: true,
+            trickle: false, // Must be false - signaling not set up for trickle ICE
             stream: currentStream,
             config: { iceServers }
         });
