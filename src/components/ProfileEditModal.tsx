@@ -61,20 +61,32 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ isOpen, onCl
     const file = files[0];
     if (file && file.type.startsWith('image/')) {
       setUploadingImage(true);
+      toast.loading('Processing image...', { id: 'upload-toast' });
 
       compressImage(file)
-        .then((result) => {
-          const currentPhotos = formData.photos || [];
-          setFormData({
-            ...formData,
-            photos: [...currentPhotos, result],
-          });
-          setUploadingImage(false);
-          toast.success('Image added successfully!');
+        .then(async (result) => {
+          // Upload to Cloudinary
+          toast.loading('Uploading to cloud...', { id: 'upload-toast' });
+          try {
+            const { upload } = await import('@/services/api');
+            const url = await upload.image(result);
+
+            const currentPhotos = formData.photos || [];
+            setFormData(prev => ({
+              ...prev,
+              photos: [...currentPhotos, url],
+            }));
+            setUploadingImage(false);
+            toast.success('Image added successfully!', { id: 'upload-toast' });
+          } catch (error) {
+            console.error(error);
+            setUploadingImage(false);
+            toast.error('Failed to upload image', { id: 'upload-toast' });
+          }
         })
         .catch(() => {
           setUploadingImage(false);
-          toast.error('Failed to process image');
+          toast.error('Failed to process image', { id: 'upload-toast' });
         });
     } else {
       toast.error('Please upload an image file');

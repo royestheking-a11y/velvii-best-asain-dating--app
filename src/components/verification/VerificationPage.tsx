@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 // import { getVerificationRequestByUserId } from '@/utils/storage';
 import { generateId } from '@/utils/helpers';
-import { users as apiUsers } from '@/services/api';
+import { users as apiUsers, upload as apiUpload } from '@/services/api';
 import { toast } from 'sonner';
 import { VerificationRequest } from '@/types';
 
@@ -138,10 +138,13 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({ onClose }) =
 
         setTimeout(async () => {
             try {
+                // Upload to Cloudinary first
+                const uploadedUrl = await apiUpload.image(imageData);
+
                 // Submit via API
                 await apiUsers.verify({
                     userId: currentUser.id,
-                    selfieUrl: imageData
+                    selfieUrl: uploadedUrl
                 });
 
                 setStep('pending');

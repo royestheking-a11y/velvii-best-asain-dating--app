@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import emailjs from '@emailjs/browser';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth as authApi } from '@/services/api';
+import { auth as authApi, upload as uploadApi } from '@/services/api';
 import { compressImage, generateVelviiId, calculateAge } from '@/utils/helpers';
 import { LocationService } from '@/utils/location';
 import { getAllUsers } from '@/utils/storage';
@@ -286,23 +286,34 @@ export const RegistrationFlow: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      compressImage(file)
-        .then((result) => {
-          setData((prev) => ({
-            ...prev,
-            photos: [...prev.photos, result],
-          }));
-          toast.success('Image uploaded successfully');
-        })
-        .catch(() => {
-          toast.error('Failed to process image');
-        });
-    });
+    // Process files sequentially to avoid overwhelming the browser/network
+    for (const file of Array.from(files)) {
+      try {
+        toast.loading('Processing image...', { id: 'upload-toast' });
+
+        // 1. Compress
+        const compressedBase64 = await compressImage(file);
+
+        // 2. Upload to Cloudinary
+        toast.loading('Uploading to cloud...', { id: 'upload-toast' });
+        const imageUrl = await uploadApi.image(compressedBase64);
+
+        // 3. Update State
+        setData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, imageUrl],
+        }));
+
+        toast.success('Image uploaded successfully', { id: 'upload-toast' });
+      } catch (error) {
+        console.error("Upload failed", error);
+        toast.error('Failed to upload image', { id: 'upload-toast' });
+      }
+    }
   };
 
   const removePhoto = (index: number) => {
