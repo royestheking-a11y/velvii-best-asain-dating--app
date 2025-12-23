@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Like = require('../models/Like');
 const SwipeAction = require('../models/SwipeAction');
@@ -129,10 +130,18 @@ router.post('/like', async (req, res) => {
         });
 
         // AI AUTO-MATCH RULE: If target is AI, force a mutual like
-        // Check by _id (standard) or id (custom)
-        const targetUser = await User.findOne({
-            $or: [{ _id: toUserId }, { id: toUserId }]
-        });
+        // Check by _id (standard) or id (custom) - SAFELY
+        let targetUser = null;
+        if (mongoose.Types.ObjectId.isValid(toUserId)) {
+            targetUser = await User.findOne({ _id: toUserId });
+        }
+        if (!targetUser) {
+            // Only try custom 'id' lookup if not found by _id
+            // Note: Schema doesn't define 'id' so this might rely on loose schema or legacy data
+            try {
+                targetUser = await User.findOne({ id: toUserId });
+            } catch (e) { /* ignore */ }
+        }
         if (targetUser && targetUser.isAI) {
             const aiLike = new Like({
                 fromUserId: toUserId,
