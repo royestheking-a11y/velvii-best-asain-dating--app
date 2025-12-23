@@ -811,6 +811,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log('[CameraSwitch] Found cameras:', videoDevices.length, videoDevices.map(d => d.label));
 
             if (videoDevices.length <= 1) {
                 toast.info("Only one camera available");
@@ -824,13 +825,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             const nextIndex = (currentIndex + 1) % videoDevices.length;
             const nextDevice = videoDevices[nextIndex];
 
-            console.log(`[CameraSwitch] Switching to ${nextDevice.label || nextDevice.deviceId}`);
+            console.log(`[CameraSwitch] Current: ${currentDeviceId}`);
+            console.log(`[CameraSwitch] Switching to: ${nextDevice.deviceId} (${nextDevice.label})`);
 
             // 1. Get new stream FIRST (keep old one alive)
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { deviceId: { exact: nextDevice.deviceId } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
+            console.log('[CameraSwitch] Got new track:', newVideoTrack.id, newVideoTrack.label);
 
             // 2. Replace track in peer connection
             if (connectionRef.current && (connectionRef.current as any)._pc) {
@@ -869,8 +872,10 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             toast.success(`Switched to ${nextDevice.label || 'next camera'}`);
 
         } catch (err: any) {
-            console.error("Error switching camera:", err);
-            toast.error("Unable to switch camera");
+            console.error("[CameraSwitch] ERROR:", err);
+            console.error("[CameraSwitch] Error name:", err.name);
+            console.error("[CameraSwitch] Error message:", err.message);
+            toast.error(`Camera switch failed: ${err.message || 'Unknown error'}`);
         }
     };
 
