@@ -65,6 +65,15 @@ app.use('/api/actions', require('./routes/actions'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/upload', require('./routes/upload')); // Generic image upload
 
+// Health check endpoint for keep-alive pings (cron-job.org)
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 const server = http.createServer(app);
 
 // Allow connection from frontend (usually localhost:5173 or 5174)
