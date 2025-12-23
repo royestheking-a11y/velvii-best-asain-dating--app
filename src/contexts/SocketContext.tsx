@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 import { CallModal } from '@/components/calling/CallModal';
 import { toast } from 'sonner';
 import { Maximize2, Mic, MicOff, PhoneOff } from 'lucide-react';
-import { messages as apiMessages, matches as apiMatches } from '@/services/api';
+import { messages as apiMessages, matches as apiMatches, users as apiUsers } from '@/services/api';
 import { addMessage, updateMessage, getMatchById, updateMatch } from '@/utils/storage';
 import { generateId } from '@/utils/helpers';
 import { Message } from '@/types';
@@ -473,7 +473,9 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 try {
                     const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                     setStream(audioStream);
-                    setIsVideoCall(false);
+                    // FIXED: Don't change isVideoCall to false, because the CALL intent is still video.
+                    // If we set it to false, we won't render the OTHER person's video.
+                    setIsCameraOn(false); // We just turn off our camera state
                     return audioStream;
                 } catch (audioErr) {
                     toast.error('Could not access microphone.');
@@ -549,38 +551,31 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setIsMinimized(false);
 
             startActualCall(userId, isVideo);
+            startActualCall(userId, isVideo);
         } else {
-            // Dynamic Check: Maybe backend knows it's allowed (User B accepted) but local is stale
+            // Dynamic Check: Check DB for persistent permission
             let serverPerm = false;
-            if (resolvedMatchId) {
-                try {
-                    console.log("[CallDebug] Checking server for match permission...");
+            try {
+                // Check if targetUser is in currentUser.callPermissions
+                if (currentUser && currentUser.callPermissions && currentUser.callPermissions.includes(userId)) {
+                    serverPerm = true;
+                    console.log("[CallDebug] Found persistent permission in user profile!");
+                } else if (resolvedMatchId) {
+                    // Fallback to match check
                     const matchData = await apiMatches.getById(resolvedMatchId);
-                    if (matchData && matchData.voiceCallEnabled) {
-                        serverPerm = true;
-                        console.log("[CallDebug] Server says YES! Validating local permission...");
-
-                        // FIX: If server says yes, update Local Storage so next check is instant
-                        // This fixes the "Google User" issue where local might be empty initially
-                        const permKey = `voice_perm_${currentUser?.id}_${userId}`;
-                        localStorage.setItem(permKey, 'true');
-
-                        // Update local match cache
-                        updateMatch(resolvedMatchId, { voiceCallEnabled: true });
-
-                        // It's allowed! correct state and start
-                        setCallerName(userName);
-                        setCallerImage(userImage);
-                        setOtherUserId(userId);
-                        if (resolvedMatchId) setCurrentMatchId(resolvedMatchId);
-                        setIsMinimized(false);
-
-                        startActualCall(userId, isVideo);
-                        return;
-                    }
-                } catch (e) {
-                    console.log("[CallDebug] Server check failed", e);
+                    if (matchData && matchData.voiceCallEnabled) serverPerm = true;
                 }
+            } catch (e) { console.log("[CallDebug] Perm check error", e); }
+
+            if (serverPerm) {
+                // Update local cache
+                const permKey = `voice_perm_${currentUser?.id}_${userId}`;
+                localStorage.setItem(permKey, 'true');
+
+                // Update Local State if needed
+
+                startActualCall(userId, isVideo);
+                return;
             }
 
             console.log("[CallDebug] Permission missing. Sending request.");
@@ -861,6 +856,18 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
         if (currentUser?.id) {
             localStorage.setItem(`voice_perm_${currentUser.id}_${targetUserId}`, 'true');
+        }
+
+        // 2. Add Permission Logic (Bidirectional & Persistent)
+        try {
+            // Call the new backend endpoint to update DB for BOTH users
+            // Note: apiUsers needs to be imported if not already, or we can use existing instance if available
+            // Checking imports: import { users as apiUsers ... } from '@/services/api'; -> It is usually imported as apiUsers
+            // But checking top of file...
+            apiUsers.acceptCallPermission(currentUser!.id, targetUserId);
+            console.log("[CallDebug] Bidirectional permission saved to DB.");
+        } catch (e) {
+            console.error("[CallDebug] Failed to save permission to DB", e);
         }
 
         // KEY FIX: Enable voice call on the Match object itself (Bidirectional)

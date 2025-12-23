@@ -11,6 +11,7 @@ export interface User {
   age: number;
   gender: 'male' | 'female' | 'other';
   interestedIn: 'men' | 'women' | 'everyone';
+  callPermissions?: string[];
   photos: string[];
   bio: string;
   interests: string[];

@@ -181,5 +181,22 @@ router.post('/subscribe', async (req, res) => {
         res.status(500).json({ error: 'Error processing subscription' });
     }
 });
+// Accept Call Permission Bidirectionally
+router.post('/call-permission/accept', async (req, res) => {
+    try {
+        const { userId, targetUserId } = req.body;
+
+        // Add each other to callPermissions array
+        await Promise.all([
+            User.findByIdAndUpdate(userId, { $addToSet: { callPermissions: targetUserId } }),
+            User.findByIdAndUpdate(targetUserId, { $addToSet: { callPermissions: userId } })
+        ]);
+
+        res.json({ success: true, message: 'Bidirectional call permission established' });
+    } catch (error) {
+        console.error("Call Permission Error:", error);
+        res.status(500).json({ error: 'Failed to update call permissions' });
+    }
+});
 
 module.exports = router;

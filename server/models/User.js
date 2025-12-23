@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
     lookingFor: { type: String, default: 'relationship' },
     showMeCriteria: [{ type: String }], // 'man', 'woman', 'nonbinary', 'everyone'
     photos: [{ type: String }],
+    callPermissions: [{ type: String }], // Array of user IDs allowed to call this user
     bio: { type: String, default: '' },
     interests: [{ type: String }],
     height: { type: Number },

@@ -114,6 +114,10 @@ export const users = {
             const response = await api.get(`/users/${userId}/verification`);
             return response.data;
         }, 5 * 60 * 1000);
+    },
+    acceptCallPermission: async (userId: string, targetUserId: string): Promise<any> => {
+        const response = await api.post('/users/call-permission/accept', { userId, targetUserId });
+        return response.data;
     }
 };
 
