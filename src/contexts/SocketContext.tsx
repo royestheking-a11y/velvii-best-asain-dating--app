@@ -795,9 +795,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setIsCameraOn(!isCameraOn);
         }
     };
-    // Switch Camera (Front/Back) - Mobile-friendly approach
-    const [currentFacingMode, setCurrentFacingMode] = useState<'user' | 'environment'>('user');
-
+    // Switch Camera (Front/Back)
     const switchCamera = async () => {
         if (!stream) {
             toast.error("No video stream available");
@@ -811,61 +809,68 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
 
         try {
-            // Toggle facing mode
-            const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-            console.log(`[CameraSwitch] Switching to ${newFacingMode} camera`);
+            if (videoDevices.length <= 1) {
+                toast.info("Only one camera available");
+                return;
+            }
 
-            // Stop the current track first (required on mobile to release camera)
-            videoTrack.stop();
-            stream.removeTrack(videoTrack);
+            const currentSettings = videoTrack.getSettings();
+            const currentDeviceId = currentSettings.deviceId;
 
-            // Get new stream with opposite facing mode
+            const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
+            const nextIndex = (currentIndex + 1) % videoDevices.length;
+            const nextDevice = videoDevices[nextIndex];
+
+            console.log(`[CameraSwitch] Switching to ${nextDevice.label || nextDevice.deviceId}`);
+
+            // 1. Get new stream FIRST (keep old one alive)
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacingMode },
-                audio: false
+                video: { deviceId: { exact: nextDevice.deviceId } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
 
-            // Add new track to stream
-            stream.addTrack(newVideoTrack);
-
-            // Replace track in peer connection
+            // 2. Replace track in peer connection
             if (connectionRef.current && (connectionRef.current as any)._pc) {
                 try {
                     const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
                     const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track === null || s.track?.kind === 'video');
+                    const videoSender = senders.find(s => s.track?.kind === 'video');
+
                     if (videoSender) {
                         await videoSender.replaceTrack(newVideoTrack);
                         console.log("[CameraSwitch] Track replaced in peer connection");
                     }
                 } catch (e) {
-                    console.warn("[CameraSwitch] replaceTrack warning:", e);
-                    // Continue anyway - local preview will still work
+                    console.warn("[CameraSwitch] replaceTrack failed:", e);
                 }
             }
 
-            // Update local video preview
+            // 3. Update local stream
+            stream.removeTrack(videoTrack);
+            stream.addTrack(newVideoTrack);
+
+            // 4. Update local video element
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
-                localVideoRef.current.srcObject = stream;
+                // Small delay to prevent flickering
+                setTimeout(() => {
+                    if (localVideoRef.current) {
+                        localVideoRef.current.srcObject = stream;
+                    }
+                }, 100);
             }
 
-            setCurrentFacingMode(newFacingMode);
-            toast.success(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`);
+            // 5. STOP local old track
+            videoTrack.stop();
+
+            toast.success(`Switched to ${nextDevice.label || 'next camera'}`);
 
         } catch (err: any) {
             console.error("Error switching camera:", err);
-
-            // More specific error messages
-            if (err.name === 'NotAllowedError') {
-                toast.error("Camera access denied");
-            } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
-                toast.error("No other camera available");
-            } else {
-                toast.error("Unable to switch camera");
-            }
+            toast.error("Unable to switch camera");
         }
     };
 
