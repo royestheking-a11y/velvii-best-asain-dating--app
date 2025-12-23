@@ -796,95 +796,60 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
-    // Switch Camera (Front/Back) - ATOMIC with RECOVERY
+    // Switch Camera (Front/Back) - WORKING VERSION
     const switchCamera = async () => {
-        if (!stream) return toast.error("No video stream");
+        if (!stream) return;
 
-        // 1. Validate current state
         const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) return toast.error("No camera track");
-
-        // 2. Locate Sender BEFORE any destructive action
-        let videoSender: RTCRtpSender | undefined;
-        try {
-            if (connectionRef.current && (connectionRef.current as any)._pc) {
-                const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
-                videoSender = pc.getSenders().find(s => s.track && (s.track.id === videoTrack.id || s.track.kind === 'video'));
-            }
-        } catch (e) { console.warn("Sender lookup skipped", e); }
+        if (!videoTrack) return;
 
         try {
-            // 3. Determine Next Device
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            if (videoDevices.length <= 1) return toast.info("Only one camera available");
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (videoDevices.length <= 1) {
+                toast.info("Only one camera available");
+                return;
+            }
 
             const currentSettings = videoTrack.getSettings();
             const currentDeviceId = currentSettings.deviceId;
-            const nextIndex = (videoDevices.findIndex(d => d.deviceId === currentDeviceId) + 1) % videoDevices.length;
+            const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
+            const nextIndex = (currentIndex + 1) % videoDevices.length;
             const nextDevice = videoDevices[nextIndex];
 
-            console.log(`[CameraSwitch] ${currentDeviceId} -> ${nextDevice.deviceId}`);
-
-            // 4. DESTRUCTIVE ACTION: Stop old track (Required for Android/iOS)
+            // CRITICAL: Stop the old track FIRST to release hardware lock on mobile
             videoTrack.stop();
             stream.removeTrack(videoTrack);
 
-            // 5. SAFETY DELAY: Hardware release
-            await new Promise(r => setTimeout(r, 300));
+            console.log(`[CameraSwitch] Switching to ${nextDevice.label}`);
 
-            // 6. ATTEMPT NEW CAMERA
-            try {
-                const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: { exact: nextDevice.deviceId } }
-                });
-                const newTrack = newStream.getVideoTracks()[0];
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: nextDevice.deviceId } }
+            });
+            const newVideoTrack = newStream.getVideoTracks()[0];
+            stream.addTrack(newVideoTrack);
 
-                // Success! Apply new track
-                stream.addTrack(newTrack);
-                if (videoSender) await videoSender.replaceTrack(newTrack).catch(e => console.error("Replace failed", e));
-
-                toast.success(`Switched to ${nextDevice.label || 'camera'}`);
-
-            } catch (switchError) {
-                console.error("[CameraSwitch] New camera failed:", switchError);
-                toast.error("Failed to switch. Restoring...");
-
-                // 7. RECOVERY: Restore OLD camera
+            // Use simple-peer's replaceTrack API (3 arguments)
+            if (connectionRef.current) {
                 try {
-                    // Try specific old ID first
-                    const recoverStream = await navigator.mediaDevices.getUserMedia({
-                        video: { deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined }
-                    });
-                    const recoverTrack = recoverStream.getVideoTracks()[0];
-                    stream.addTrack(recoverTrack); // Restore to local stream
-                    if (videoSender) await videoSender.replaceTrack(recoverTrack);
-                    console.log("[CameraSwitch] Recovered original camera");
-                } catch (recoveryError) {
-                    // 8. NUCLEAR FALLLBACK: Any camera
-                    console.error("[CameraSwitch] Specific recovery failed:", recoveryError);
-                    try {
-                        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        const fallbackTrack = fallbackStream.getVideoTracks()[0];
-                        stream.addTrack(fallbackTrack);
-                        if (videoSender) await videoSender.replaceTrack(fallbackTrack);
-                        console.log("[CameraSwitch] Recovered generic camera");
-                    } catch (fatalError) {
-                        console.error("[CameraSwitch] FATAL: Could not recover any camera", fatalError);
-                        toast.error("Camera lost. Please restart call.");
-                    }
+                    connectionRef.current.replaceTrack(videoTrack, newVideoTrack, stream);
+                } catch (e) {
+                    console.warn("replaceTrack failed", e);
                 }
             }
 
-            // 9. UI Sync
+            // Force refresh local video element
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
-                setTimeout(() => { if (localVideoRef.current) localVideoRef.current.srcObject = stream; }, 50);
+                localVideoRef.current.srcObject = stream;
             }
 
-        } catch (e: any) {
-            console.error("[CameraSwitch] Global Error:", e);
-            toast.error("Switch error: " + e.message);
+            toast.success(`Switched to ${nextDevice.label || 'camera'}`);
+
+        } catch (err: any) {
+            console.error("Error switching camera:", err);
+            toast.error("Unable to switch camera");
         }
     };
 
