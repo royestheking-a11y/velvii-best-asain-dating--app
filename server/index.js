@@ -181,8 +181,8 @@ io.on("connection", (socket) => {
         } else {
             // 3. User is OFFLINE -> Send Push Notification
             console.log(`[SERVER] User ${to} is offline. Attempting Push Notification...`);
-            const Subscription = require('./models/Subscription');
-            const subscriptions = await Subscription.find({ userId: to });
+            const PushSubscription = require('./models/PushSubscription');
+            const subscriptions = await PushSubscription.find({ userId: to });
 
             if (subscriptions.length > 0) {
                 // Determine notification body - show friendly text for images
