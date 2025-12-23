@@ -798,10 +798,16 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     // Switch Camera (Front/Back)
     const switchCamera = async () => {
-        if (!stream) return;
+        if (!stream) {
+            toast.error("No video stream available");
+            return;
+        }
 
         const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) return;
+        if (!videoTrack) {
+            toast.error("No camera track found");
+            return;
+        }
 
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -819,31 +825,41 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             const nextIndex = (currentIndex + 1) % videoDevices.length;
             const nextDevice = videoDevices[nextIndex];
 
-            // CRITICAL: Stop the old track FIRST to release hardware lock on mobile
-            videoTrack.stop();
-            stream.removeTrack(videoTrack);
-
             console.log(`[CameraSwitch] Switching to ${nextDevice.label}`);
 
+            // Get new video stream BEFORE stopping old track
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { deviceId: { exact: nextDevice.deviceId } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
 
-            stream.addTrack(newVideoTrack);
-
-            if (connectionRef.current) {
+            // Replace track in peer connection FIRST (while old track still exists)
+            if (connectionRef.current && (connectionRef.current as any)._pc) {
                 try {
-                    connectionRef.current.replaceTrack(videoTrack, newVideoTrack, stream);
+                    const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
+                    const senders = pc.getSenders();
+                    const videoSender = senders.find(s => s.track?.kind === 'video');
+                    if (videoSender) {
+                        await videoSender.replaceTrack(newVideoTrack);
+                        console.log("[CameraSwitch] Track replaced in peer connection");
+                    }
                 } catch (e) {
-                    console.warn("replaceTrack failed", e);
+                    console.warn("[CameraSwitch] replaceTrack failed, call may need reconnection:", e);
                 }
             }
 
+            // NOW stop and remove old track
+            videoTrack.stop();
+            stream.removeTrack(videoTrack);
+            stream.addTrack(newVideoTrack);
+
+            // Update local video preview
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
                 localVideoRef.current.srcObject = stream;
             }
+
+            toast.success("Camera switched");
 
         } catch (err) {
             console.error("Error switching camera:", err);
