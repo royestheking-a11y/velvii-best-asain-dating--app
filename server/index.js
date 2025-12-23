@@ -369,7 +369,8 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- GEMINI AI CONFIGURATION ---
 // --- GEMINI AI CONFIGURATION ---
-const API_KEYS = (process.env.GEMINI_API_KEY || "").split(',').filter(k => k.trim());
+const USER_PROVIDED_KEY = "AIzaSyBIYhHw_G6tnYvgMb_sgDpwKqTZG-Mlh60";
+const API_KEYS = [USER_PROVIDED_KEY, ...(process.env.GEMINI_API_KEY || "").split(',')].filter(k => k.trim());
 
 let keyIndex = 0;
 const getGeminiModel = () => {
