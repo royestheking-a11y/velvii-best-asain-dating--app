@@ -796,95 +796,94 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
-    // Switch Camera (Front/Back) - ATOMIC with RECOVERY
+    // Switch Camera (Front/Back) - Using facingMode for reliability
     const switchCamera = async () => {
         if (!stream) return toast.error("No video stream");
 
-        // 1. Validate current state
         const videoTrack = stream.getVideoTracks()[0];
         if (!videoTrack) return toast.error("No camera track");
 
-        // 2. Locate Sender BEFORE any destructive action
+        // Determine current facing mode
+        const currentSettings = videoTrack.getSettings();
+        const currentFacingMode = currentSettings.facingMode || 'user';
+        const nextFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+        console.log(`[CameraSwitch] ${currentFacingMode} -> ${nextFacingMode}`);
+
+        // Pre-fetch sender while track is active
         let videoSender: RTCRtpSender | undefined;
         try {
             if (connectionRef.current && (connectionRef.current as any)._pc) {
                 const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
-                videoSender = pc.getSenders().find(s => s.track && (s.track.id === videoTrack.id || s.track.kind === 'video'));
+                videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
             }
         } catch (e) { console.warn("Sender lookup skipped", e); }
 
         try {
-            // 3. Determine Next Device
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            if (videoDevices.length <= 1) return toast.info("Only one camera available");
-
-            const currentSettings = videoTrack.getSettings();
-            const currentDeviceId = currentSettings.deviceId;
-            const nextIndex = (videoDevices.findIndex(d => d.deviceId === currentDeviceId) + 1) % videoDevices.length;
-            const nextDevice = videoDevices[nextIndex];
-
-            console.log(`[CameraSwitch] ${currentDeviceId} -> ${nextDevice.deviceId}`);
-
-            // 4. DESTRUCTIVE ACTION: Stop old track (Required for Android/iOS)
+            // 1. Stop current camera
             videoTrack.stop();
             stream.removeTrack(videoTrack);
 
-            // 5. SAFETY DELAY: Hardware release
-            await new Promise(r => setTimeout(r, 300));
+            // 2. Wait for hardware release
+            await new Promise(r => setTimeout(r, 400));
 
-            // 6. ATTEMPT NEW CAMERA
-            try {
-                const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: { exact: nextDevice.deviceId } }
-                });
-                const newTrack = newStream.getVideoTracks()[0];
+            // 3. Get new camera using facingMode
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { exact: nextFacingMode } }
+            });
+            const newTrack = newStream.getVideoTracks()[0];
 
-                // Success! Apply new track
-                stream.addTrack(newTrack);
-                if (videoSender) await videoSender.replaceTrack(newTrack).catch(e => console.error("Replace failed", e));
-
-                toast.success(`Switched to ${nextDevice.label || 'camera'}`);
-
-            } catch (switchError) {
-                console.error("[CameraSwitch] New camera failed:", switchError);
-                toast.error("Failed to switch. Restoring...");
-
-                // 7. RECOVERY: Restore OLD camera
-                try {
-                    // Try specific old ID first
-                    const recoverStream = await navigator.mediaDevices.getUserMedia({
-                        video: { deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined }
-                    });
-                    const recoverTrack = recoverStream.getVideoTracks()[0];
-                    stream.addTrack(recoverTrack); // Restore to local stream
-                    if (videoSender) await videoSender.replaceTrack(recoverTrack);
-                    console.log("[CameraSwitch] Recovered original camera");
-                } catch (recoveryError) {
-                    // 8. NUCLEAR FALLLBACK: Any camera
-                    console.error("[CameraSwitch] Specific recovery failed:", recoveryError);
-                    try {
-                        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        const fallbackTrack = fallbackStream.getVideoTracks()[0];
-                        stream.addTrack(fallbackTrack);
-                        if (videoSender) await videoSender.replaceTrack(fallbackTrack);
-                        console.log("[CameraSwitch] Recovered generic camera");
-                    } catch (fatalError) {
-                        console.error("[CameraSwitch] FATAL: Could not recover any camera", fatalError);
-                        toast.error("Camera lost. Please restart call.");
-                    }
-                }
+            // 4. Apply new track
+            stream.addTrack(newTrack);
+            if (videoSender) {
+                await videoSender.replaceTrack(newTrack).catch(e => console.error("Replace failed", e));
             }
 
-            // 9. UI Sync
+            // 5. Update UI
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
                 setTimeout(() => { if (localVideoRef.current) localVideoRef.current.srcObject = stream; }, 50);
             }
 
-        } catch (e: any) {
-            console.error("[CameraSwitch] Global Error:", e);
-            toast.error("Switch error: " + e.message);
+            toast.success(`Switched to ${nextFacingMode === 'user' ? 'front' : 'back'} camera`);
+
+        } catch (err: any) {
+            console.error("[CameraSwitch] Failed:", err);
+
+            // RECOVERY: If facingMode exact fails, try ideal
+            try {
+                const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: nextFacingMode } // Without 'exact'
+                });
+                const fallbackTrack = fallbackStream.getVideoTracks()[0];
+                stream.addTrack(fallbackTrack);
+                if (videoSender) await videoSender.replaceTrack(fallbackTrack);
+
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = null;
+                    setTimeout(() => { if (localVideoRef.current) localVideoRef.current.srcObject = stream; }, 50);
+                }
+                toast.success(`Switched camera`);
+                return;
+            } catch (e2) {
+                console.error("[CameraSwitch] Fallback also failed:", e2);
+            }
+
+            // NUCLEAR RECOVERY: Restore ANY camera
+            toast.error("Switch failed. Restoring camera...");
+            try {
+                const recoveryStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const recoveryTrack = recoveryStream.getVideoTracks()[0];
+                stream.addTrack(recoveryTrack);
+                if (videoSender) await videoSender.replaceTrack(recoveryTrack);
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = null;
+                    setTimeout(() => { if (localVideoRef.current) localVideoRef.current.srcObject = stream; }, 50);
+                }
+            } catch (fatalErr) {
+                console.error("[CameraSwitch] FATAL:", fatalErr);
+                toast.error("Camera lost. End call and retry.");
+            }
         }
     };
 
