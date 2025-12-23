@@ -65,18 +65,19 @@ const OnboardingPage = () => {
         });
     };
 
-    // IP-based location fallback
+    // IP-based location fallback (using ip-api.com which supports CORS)
     const getLocationFromIP = async () => {
         try {
-            const res = await fetch('https://ipapi.co/json/');
+            // ip-api.com is free and allows CORS for browser requests
+            const res = await fetch('http://ip-api.com/json/?fields=status,city,country,lat,lon');
             const data = await res.json();
 
-            if (data.city && data.country_name) {
+            if (data.status === 'success' && data.city) {
                 setLocation({
-                    lat: data.latitude || 23.8103,
-                    lng: data.longitude || 90.4125,
+                    lat: data.lat || 23.8103,
+                    lng: data.lon || 90.4125,
                     city: data.city,
-                    country: data.country_name
+                    country: data.country
                 });
                 toast.success(`Location detected: ${data.city}`);
             } else {
