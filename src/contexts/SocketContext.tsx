@@ -796,108 +796,95 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
-    // Switch Camera (Front/Back)
+    // Switch Camera (Front/Back) - ATOMIC with RECOVERY
     const switchCamera = async () => {
-        if (!stream) {
-            toast.error("No video stream");
-            return;
-        }
+        if (!stream) return toast.error("No video stream");
 
+        // 1. Validate current state
         const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) {
-            toast.error("No camera track");
-            return;
-        }
+        if (!videoTrack) return toast.error("No camera track");
+
+        // 2. Locate Sender BEFORE any destructive action
+        let videoSender: RTCRtpSender | undefined;
+        try {
+            if (connectionRef.current && (connectionRef.current as any)._pc) {
+                const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
+                videoSender = pc.getSenders().find(s => s.track && (s.track.id === videoTrack.id || s.track.kind === 'video'));
+            }
+        } catch (e) { console.warn("Sender lookup skipped", e); }
 
         try {
-            // 0. Pre-fetch video sender from peer connection (while track is still active)
-            let videoSender: RTCRtpSender | undefined;
-            if (connectionRef.current && (connectionRef.current as any)._pc) {
-                try {
-                    const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
-                    const senders = pc.getSenders();
-                    // Locate sender whose track matches current video track OR has video kind
-                    videoSender = senders.find(s => s.track && (s.track.id === videoTrack.id || s.track.kind === 'video'));
-                } catch (e) {
-                    console.warn("[CameraSwitch] Sender lookup warning:", e);
-                }
-            }
-
+            // 3. Determine Next Device
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-            if (videoDevices.length <= 1) {
-                toast.info("Only one camera available");
-                return;
-            }
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            if (videoDevices.length <= 1) return toast.info("Only one camera available");
 
             const currentSettings = videoTrack.getSettings();
             const currentDeviceId = currentSettings.deviceId;
-            const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
-            const nextIndex = (currentIndex + 1) % videoDevices.length;
+            const nextIndex = (videoDevices.findIndex(d => d.deviceId === currentDeviceId) + 1) % videoDevices.length;
             const nextDevice = videoDevices[nextIndex];
 
             console.log(`[CameraSwitch] ${currentDeviceId} -> ${nextDevice.deviceId}`);
 
-            // 1. STOP old track explicitly & remove
+            // 4. DESTRUCTIVE ACTION: Stop old track (Required for Android/iOS)
             videoTrack.stop();
             stream.removeTrack(videoTrack);
 
-            // 2. WAIT for hardware release (Critical for some Androids)
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // 5. SAFETY DELAY: Hardware release
+            await new Promise(r => setTimeout(r, 300));
 
-            // 3. Get new stream
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: nextDevice.deviceId } }
-            });
-            const newVideoTrack = newStream.getVideoTracks()[0];
-            console.log('[CameraSwitch] Got new track:', newVideoTrack.label);
+            // 6. ATTEMPT NEW CAMERA
+            try {
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: nextDevice.deviceId } }
+                });
+                const newTrack = newStream.getVideoTracks()[0];
 
-            // 4. Update local stream
-            stream.addTrack(newVideoTrack);
+                // Success! Apply new track
+                stream.addTrack(newTrack);
+                if (videoSender) await videoSender.replaceTrack(newTrack).catch(e => console.error("Replace failed", e));
 
-            // 5. Replace track in peer connection (using pre-fetched sender)
-            if (videoSender) {
+                toast.success(`Switched to ${nextDevice.label || 'camera'}`);
+
+            } catch (switchError) {
+                console.error("[CameraSwitch] New camera failed:", switchError);
+                toast.error("Failed to switch. Restoring...");
+
+                // 7. RECOVERY: Restore OLD camera
                 try {
-                    await videoSender.replaceTrack(newVideoTrack);
-                    console.log("[CameraSwitch] Track replaced on sender");
-                } catch (e) {
-                    console.error("[CameraSwitch] Replace failed:", e);
-                }
-            } else if (connectionRef.current) {
-                // Sender not found? Try checking again (rare)
-                console.warn("[CameraSwitch] No sender found initially, trying simple-peer addTrack");
-                try {
-                    if (typeof (connectionRef.current as any).addTrack === 'function') {
-                        (connectionRef.current as any).addTrack(newVideoTrack, stream);
+                    // Try specific old ID first
+                    const recoverStream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined }
+                    });
+                    const recoverTrack = recoverStream.getVideoTracks()[0];
+                    stream.addTrack(recoverTrack); // Restore to local stream
+                    if (videoSender) await videoSender.replaceTrack(recoverTrack);
+                    console.log("[CameraSwitch] Recovered original camera");
+                } catch (recoveryError) {
+                    // 8. NUCLEAR FALLLBACK: Any camera
+                    console.error("[CameraSwitch] Specific recovery failed:", recoveryError);
+                    try {
+                        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        const fallbackTrack = fallbackStream.getVideoTracks()[0];
+                        stream.addTrack(fallbackTrack);
+                        if (videoSender) await videoSender.replaceTrack(fallbackTrack);
+                        console.log("[CameraSwitch] Recovered generic camera");
+                    } catch (fatalError) {
+                        console.error("[CameraSwitch] FATAL: Could not recover any camera", fatalError);
+                        toast.error("Camera lost. Please restart call.");
                     }
-                } catch (err) { console.warn("[CameraSwitch] fallback addTrack failed", err); }
+                }
             }
 
-            // 6. Force update local video element
+            // 9. UI Sync
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null;
-                setTimeout(() => {
-                    if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-                }, 50);
+                setTimeout(() => { if (localVideoRef.current) localVideoRef.current.srcObject = stream; }, 50);
             }
 
-            toast.success(`Switched to ${nextDevice.label || 'camera'}`);
-
-        } catch (err: any) {
-            console.error("[CameraSwitch] Failed:", err);
-            // Panic recovery: Try to restart ANY camera if we lost everything
-            toast.error(`Switch failed: ${err.message || 'Error'}`);
-
-            // Try to restore ANY camera
-            if (stream && stream.getVideoTracks().length === 0) {
-                try {
-                    console.log("[CameraSwitch] Attempting recovery...");
-                    const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    stream.addTrack(fallbackStream.getVideoTracks()[0]);
-                    if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-                } catch (recErr) { console.error("Recovery failed", recErr); }
-            }
+        } catch (e: any) {
+            console.error("[CameraSwitch] Global Error:", e);
+            toast.error("Switch error: " + e.message);
         }
     };
 
