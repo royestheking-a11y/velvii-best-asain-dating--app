@@ -31,8 +31,8 @@ const OnboardingPage = () => {
     const handleGetLocation = () => {
         setLocLoading(true);
         if (!navigator.geolocation) {
-            toast.error("Geolocation is not supported by your browser");
-            setLocLoading(false);
+            // Fallback to IP-based location
+            getLocationFromIP();
             return;
         }
 
@@ -60,9 +60,48 @@ const OnboardingPage = () => {
             }
         }, (error) => {
             console.error("Geo Error", error);
-            toast.error("Please allow location access to continue matching.");
-            setLocLoading(false);
+            // Fallback to IP-based location instead of just showing error
+            getLocationFromIP();
         });
+    };
+
+    // IP-based location fallback
+    const getLocationFromIP = async () => {
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+
+            if (data.city && data.country_name) {
+                setLocation({
+                    lat: data.latitude || 23.8103,
+                    lng: data.longitude || 90.4125,
+                    city: data.city,
+                    country: data.country_name
+                });
+                toast.success(`Location detected: ${data.city}`);
+            } else {
+                // Ultimate fallback: Dhaka, Bangladesh
+                setLocation({
+                    lat: 23.8103,
+                    lng: 90.4125,
+                    city: 'Dhaka',
+                    country: 'Bangladesh'
+                });
+                toast.info("Using default location. You can update this later.");
+            }
+        } catch (error) {
+            console.error("IP Location Error", error);
+            // Ultimate fallback
+            setLocation({
+                lat: 23.8103,
+                lng: 90.4125,
+                city: 'Dhaka',
+                country: 'Bangladesh'
+            });
+            toast.info("Using default location. You can update this later.");
+        } finally {
+            setLocLoading(false);
+        }
     };
 
     const calculateAge = (dob: string) => {
