@@ -221,19 +221,23 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
                     // Send to Server
                     if (subscription) {
-                        // User requested to IGNORE subscription errors for now.
-                        // await fetch(`${API_URL}/notifications/subscribe`, {
-                        //     method: 'POST',
-                        //     body: JSON.stringify({
-                        //         subscription,
-                        //         userId: currentUser.id,
-                        //         userAgent: navigator.userAgent
-                        //     }),
-                        //     headers: {
-                        //         'Content-Type': 'application/json'
-                        //     }
-                        // });
-                        console.log("✅ Push Subscription (Skipped/Disabled)");
+                        try {
+                            await fetch(`${API_URL}/notifications/subscribe`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    subscription,
+                                    userId: currentUser.id,
+                                    userAgent: navigator.userAgent
+                                }),
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            console.log("✅ Push Subscription Registered");
+                        } catch (subError) {
+                            // Don't crash the app if subscription fails
+                            console.warn("Push subscription save failed (non-critical):", subError);
+                        }
                     }
 
                 } catch (err) {
