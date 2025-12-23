@@ -795,8 +795,9 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setIsCameraOn(!isCameraOn);
         }
     };
+    // Switch Camera (Front/Back) - Mobile-friendly approach
+    const [currentFacingMode, setCurrentFacingMode] = useState<'user' | 'environment'>('user');
 
-    // Switch Camera (Front/Back)
     const switchCamera = async () => {
         if (!stream) {
             toast.error("No video stream available");
@@ -810,48 +811,40 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
 
         try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            // Toggle facing mode
+            const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
 
-            if (videoDevices.length <= 1) {
-                toast.info("Only one camera available");
-                return;
-            }
+            console.log(`[CameraSwitch] Switching to ${newFacingMode} camera`);
 
-            const currentSettings = videoTrack.getSettings();
-            const currentDeviceId = currentSettings.deviceId;
+            // Stop the current track first (required on mobile to release camera)
+            videoTrack.stop();
+            stream.removeTrack(videoTrack);
 
-            const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
-            const nextIndex = (currentIndex + 1) % videoDevices.length;
-            const nextDevice = videoDevices[nextIndex];
-
-            console.log(`[CameraSwitch] Switching to ${nextDevice.label}`);
-
-            // Get new video stream BEFORE stopping old track
+            // Get new stream with opposite facing mode
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: nextDevice.deviceId } }
+                video: { facingMode: newFacingMode },
+                audio: false
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
 
-            // Replace track in peer connection FIRST (while old track still exists)
+            // Add new track to stream
+            stream.addTrack(newVideoTrack);
+
+            // Replace track in peer connection
             if (connectionRef.current && (connectionRef.current as any)._pc) {
                 try {
                     const pc = (connectionRef.current as any)._pc as RTCPeerConnection;
                     const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track?.kind === 'video');
+                    const videoSender = senders.find(s => s.track === null || s.track?.kind === 'video');
                     if (videoSender) {
                         await videoSender.replaceTrack(newVideoTrack);
                         console.log("[CameraSwitch] Track replaced in peer connection");
                     }
                 } catch (e) {
-                    console.warn("[CameraSwitch] replaceTrack failed, call may need reconnection:", e);
+                    console.warn("[CameraSwitch] replaceTrack warning:", e);
+                    // Continue anyway - local preview will still work
                 }
             }
-
-            // NOW stop and remove old track
-            videoTrack.stop();
-            stream.removeTrack(videoTrack);
-            stream.addTrack(newVideoTrack);
 
             // Update local video preview
             if (localVideoRef.current) {
@@ -859,13 +852,21 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 localVideoRef.current.srcObject = stream;
             }
 
-            toast.success("Camera switched");
+            setCurrentFacingMode(newFacingMode);
+            toast.success(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`);
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error switching camera:", err);
-            toast.error("Unable to switch camera");
-        }
 
+            // More specific error messages
+            if (err.name === 'NotAllowedError') {
+                toast.error("Camera access denied");
+            } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+                toast.error("No other camera available");
+            } else {
+                toast.error("Unable to switch camera");
+            }
+        }
     };
 
     // 3. Permission Response
