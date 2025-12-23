@@ -828,12 +828,16 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             console.log(`[CameraSwitch] Current: ${currentDeviceId}`);
             console.log(`[CameraSwitch] Switching to: ${nextDevice.deviceId} (${nextDevice.label})`);
 
-            // 1. Get new stream FIRST (keep old one alive)
+            // CRITICAL: Stop old camera FIRST to release hardware (prevents 'could not start video source')
+            videoTrack.stop();
+            stream.removeTrack(videoTrack);
+
+            // Now get new camera
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: { deviceId: { exact: nextDevice.deviceId } }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
-            console.log('[CameraSwitch] Got new track:', newVideoTrack.id, newVideoTrack.label);
+            console.log('CameraSwitch] Got new track:', newVideoTrack.id, newVideoTrack.label);
 
             // 2. Replace track in peer connection
             if (connectionRef.current && (connectionRef.current as any)._pc) {
@@ -851,8 +855,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 }
             }
 
-            // 3. Update local stream
-            stream.removeTrack(videoTrack);
+            // Update local stream
             stream.addTrack(newVideoTrack);
 
             // 4. Update local video element
@@ -866,10 +869,7 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 }, 100);
             }
 
-            // 5. STOP local old track
-            videoTrack.stop();
-
-            toast.success(`Switched to ${nextDevice.label || 'next camera'}`);
+            toast.success(`Switched to ${nextDevice.label || 'camera'}`);
 
         } catch (err: any) {
             console.error("[CameraSwitch] ERROR:", err);
