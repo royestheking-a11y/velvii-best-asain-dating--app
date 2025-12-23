@@ -224,14 +224,15 @@ router.get('/likes/:userId', async (req, res) => {
         // Find likes where toUserId is the current user
         const likes = await Like.find({ toUserId: req.params.userId }).sort({ createdAt: -1 });
 
-        // Populate From User Details
+        // Populate From User Details - SAFE ID Lookup
         const populatedLikes = await Promise.all(likes.map(async (like) => {
-            const user = await User.findOne({
-                $or: [
-                    { _id: like.fromUserId },
-                    { id: like.fromUserId }
-                ]
-            });
+            let user = null;
+            if (mongoose.Types.ObjectId.isValid(like.fromUserId)) {
+                user = await User.findOne({ _id: like.fromUserId });
+            }
+            if (!user) {
+                try { user = await User.findOne({ id: like.fromUserId }); } catch (e) { /* ignore */ }
+            }
             // Add isSuperLike flag based on type
             return user ? { user, createdAt: like.createdAt, action: like.type } : null;
         }));
@@ -248,14 +249,15 @@ router.get('/swipes/:userId', async (req, res) => {
     try {
         const swipes = await SwipeAction.find({ userId: req.params.userId }).sort({ createdAt: -1 });
 
-        // Populate Target User Details
+        // Populate Target User Details - SAFE ID Lookup
         const populatedSwipes = await Promise.all(swipes.map(async (swipe) => {
-            const user = await User.findOne({
-                $or: [
-                    { _id: swipe.targetUserId },
-                    { id: swipe.targetUserId }
-                ]
-            });
+            let user = null;
+            if (mongoose.Types.ObjectId.isValid(swipe.targetUserId)) {
+                user = await User.findOne({ _id: swipe.targetUserId });
+            }
+            if (!user) {
+                try { user = await User.findOne({ id: swipe.targetUserId }); } catch (e) { /* ignore */ }
+            }
             return user ? { ...swipe.toJSON(), user } : null;
         }));
 
